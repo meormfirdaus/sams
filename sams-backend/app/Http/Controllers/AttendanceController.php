@@ -66,6 +66,7 @@ class AttendanceController extends Controller
             ->select(
                 'attendances.id',
                 'attendances.status',
+                'attendances.verification_status',
                 'attendances.location_name',
                 'attendances.created_at as submitted_at',
                 DB::raw("COALESCE(users.name, 'Unknown Student') as student_name"),
@@ -82,6 +83,7 @@ class AttendanceController extends Controller
                         ? Carbon::parse($item->submitted_at)->format('g:i a')
                         : '-',
                     'status' => $item->status ?? 'Pending',
+                    'verification_status' => $item->verification_status ?? 'Pending',
                     'location_name' => $item->location_name ?? '-',
                 ];
             });
@@ -113,9 +115,17 @@ class AttendanceController extends Controller
             ->whereIn('class_session_id', $sessions)
             ->get();
 
-        $present = $records->where('status', 'Present')->count();
-        $late = $records->where('status', 'Late')->count();
-        $absent = $records->where('status', 'Absent')->count();
+        $present = $records
+            ->filter(fn($record) => $record->status === 'Present' && ($record->verification_status ?? 'Pending') !== 'Rejected')
+            ->count();
+
+        $late = $records
+            ->filter(fn($record) => $record->status === 'Late' && ($record->verification_status ?? 'Pending') !== 'Rejected')
+            ->count();
+
+        $absent = $records
+            ->filter(fn($record) => $record->status === 'Absent' || (($record->verification_status ?? 'Pending') === 'Rejected'))
+            ->count();
 
         $totalClasses = $sessions->count();
         $attended = $present + $late;
@@ -133,19 +143,24 @@ class AttendanceController extends Controller
                 'class_sessions.class_date',
                 'class_sessions.start_time',
                 'attendances.status',
+                'attendances.verification_status',
                 'attendances.created_at'
             )
             ->orderByDesc('class_sessions.class_date')
             ->limit(10)
             ->get()
             ->map(function ($item) {
+                $displayStatus = ($item->verification_status ?? 'Pending') === 'Rejected'
+                    ? 'Absent'
+                    : $item->status;
+
                 return [
                     'session' => 'Lecture W' . $item->id,
                     'date' => Carbon::parse($item->class_date)->format('j F Y'),
                     'time' => $item->created_at
                         ? Carbon::parse($item->created_at)->format('g:i a')
                         : '-',
-                    'status' => $item->status,
+                    'status' => $displayStatus,
                 ];
             });
 
@@ -264,6 +279,102 @@ class AttendanceController extends Controller
         ]);
     }
 
+    /**
+     * Lecturer approves or rejects a student's attendance submission.
+     */
+    public function updateAttendanceStatus(Request $request, $attendanceId)
+    {
+        $request->validate([
+            'status' => 'required|in:Approved,Rejected'
+        ]);
+
+        $attendance = DB::table('attendances')
+            ->where('id', $attendanceId)
+            ->first();
+
+        if (!$attendance) {
+            return response()->json([
+                'message' => 'Attendance record not found'
+            ], 404);
+        }
+
+        DB::table('attendances')
+            ->where('id', $attendanceId)
+            ->update([
+                'verification_status' => $request->status,
+                'updated_at' => Carbon::now()
+            ]);
+
+        return response()->json([
+            'message' => 'Attendance status updated successfully',
+            'attendance_id' => $attendanceId,
+            'new_status' => $request->status
+        ]);
+    }
+
+    /**
+     * Lecturer updates a student's attendance record from the history page.
+     */
+    public function updateAttendanceRecord(Request $request, $attendanceId)
+    {
+        $request->validate([
+            'status' => 'required|in:Present,Late,Absent'
+        ]);
+
+        $attendance = DB::table('attendances')
+            ->where('id', $attendanceId)
+            ->first();
+
+        if (!$attendance) {
+            return response()->json([
+                'message' => 'Attendance record not found'
+            ], 404);
+        }
+
+        $verificationStatus = $request->status === 'Absent'
+            ? 'Rejected'
+            : 'Approved';
+
+        DB::table('attendances')
+            ->where('id', $attendanceId)
+            ->update([
+                'status' => $request->status,
+                'verification_status' => $verificationStatus,
+                'updated_at' => Carbon::now()
+            ]);
+
+        return response()->json([
+            'message' => 'Attendance record updated successfully',
+            'attendance_id' => $attendanceId,
+            'status' => $request->status,
+            'verification_status' => $verificationStatus
+        ]);
+    }
+
+    /**
+     * Lecturer deletes a student's attendance record from the history page.
+     */
+    public function deleteAttendanceRecord($attendanceId)
+    {
+        $attendance = DB::table('attendances')
+            ->where('id', $attendanceId)
+            ->first();
+
+        if (!$attendance) {
+            return response()->json([
+                'message' => 'Attendance record not found'
+            ], 404);
+        }
+
+        DB::table('attendances')
+            ->where('id', $attendanceId)
+            ->delete();
+
+        return response()->json([
+            'message' => 'Attendance record deleted successfully',
+            'attendance_id' => $attendanceId
+        ]);
+    }
 
     private function getLocationName($lat, $lon)
     {

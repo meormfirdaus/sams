@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../main.dart' show LoginPage;
 
 class LecturerHomepage extends StatefulWidget {
   const LecturerHomepage({super.key});
@@ -11,17 +12,19 @@ class LecturerHomepage extends StatefulWidget {
 class _LecturerHomepageState extends State<LecturerHomepage> {
   final int _selectedIndex = 0;
 
-  Future<void> _logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.clear();
+Future<void> _logout() async {
+  final prefs = await SharedPreferences.getInstance();
+  await prefs.clear();
 
-    if (!mounted) return;
+  if (!mounted) return;
 
-    Navigator.of(context).pushNamedAndRemoveUntil(
-      '/login',
-      (route) => false,
-    );
-  }
+  Navigator.of(context).pushAndRemoveUntil(
+    MaterialPageRoute(
+      builder: (context) => const LoginPage(),
+    ),
+    (route) => false,
+  );
+}
 
   final List<Map<String, String>> courses = [
     {

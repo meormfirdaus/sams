@@ -1,3 +1,6 @@
+
+
+
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
@@ -54,10 +57,12 @@ class _VerifyAttendancePageState extends State<VerifyAttendancePage> {
           submissions = data
               .map<Map<String, String>>(
                 (item) => {
+                  'id': item['id']?.toString() ?? '',
                   'name': item['name']?.toString() ?? '-',
                   'matric': item['matric']?.toString() ?? '-',
                   'time': item['time']?.toString() ?? '-',
-                  'status': item['status']?.toString() ?? 'Pending',
+                  'status': item['status']?.toString() ?? '-',
+                  'verification_status': item['verification_status']?.toString() ?? 'Pending',
                   'location_name': item['location_name']?.toString() ?? '-',
                 },
               )
@@ -72,6 +77,35 @@ class _VerifyAttendancePageState extends State<VerifyAttendancePage> {
           isLoading = false;
         });
       }
+    }
+  }
+
+  Future<void> updateAttendanceStatus(String attendanceId, String status) async {
+    try {
+      final response = await http.post(
+        Uri.parse('http://10.0.2.2:8000/api/attendance/$attendanceId/status'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'status': status}),
+      );
+
+      if (response.statusCode == 200) {
+        // Update the local submissions list immediately
+        setState(() {
+          final index = submissions.indexWhere((item) => item['id'] == attendanceId);
+          if (index != -1) {
+            submissions[index]['verification_status'] = status;
+          }
+        });
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Attendance $status successfully.'),
+            backgroundColor: status == 'Approved' ? Colors.green : Colors.red,
+          ),
+        );
+      }
+    } catch (e) {
+      //
     }
   }
 
@@ -250,45 +284,59 @@ class _VerifyAttendancePageState extends State<VerifyAttendancePage> {
                                 children: [
                                   Expanded(
                                     flex: 2,
-                                    child: Text(
-                                      'MATRIC NO',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                        color: Color(0xFF6F7A8C),
+                                    child: Padding(
+                                      padding: EdgeInsets.only(left: 4),
+                                      child: Text(
+                                        'MATRIC NO',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.6,
+                                          color: Color(0xFF6F7A8C),
+                                        ),
                                       ),
                                     ),
                                   ),
                                   Expanded(
                                     flex: 4,
-                                    child: Text(
-                                      'LOCATION',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                        color: Color(0xFF6F7A8C),
+                                    child: Padding(
+                                      padding: EdgeInsets.only(left: 4),
+                                      child: Text(
+                                        'LOCATION',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.6,
+                                          color: Color(0xFF6F7A8C),
+                                        ),
                                       ),
                                     ),
                                   ),
                                   Expanded(
                                     flex: 2,
-                                    child: Text(
-                                      'STATUS',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                        color: Color(0xFF6F7A8C),
+                                    child: Center(
+                                      child: Text(
+                                        'STATUS',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.6,
+                                          color: Color(0xFF6F7A8C),
+                                        ),
                                       ),
                                     ),
                                   ),
                                   Expanded(
                                     flex: 3,
-                                    child: Text(
-                                      'ACTION',
-                                      style: TextStyle(
-                                        fontSize: 11,
-                                        fontWeight: FontWeight.w700,
-                                        color: Color(0xFF6F7A8C),
+                                    child: Center(
+                                      child: Text(
+                                        'ACTION',
+                                        style: TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w700,
+                                          letterSpacing: 0.6,
+                                          color: Color(0xFF6F7A8C),
+                                        ),
                                       ),
                                     ),
                                   ),
@@ -298,7 +346,13 @@ class _VerifyAttendancePageState extends State<VerifyAttendancePage> {
                             if (isLoading)
                               const Padding(
                                 padding: EdgeInsets.all(20),
-                                child: CircularProgressIndicator(),
+                                child: SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
                               )
                             else if (submissions.isEmpty)
                               const Padding(
@@ -311,7 +365,11 @@ class _VerifyAttendancePageState extends State<VerifyAttendancePage> {
                             else
                               ...List.generate(submissions.length, (index) {
                                 final item = submissions[index];
-                                final status = item['status'] ?? '';
+                                final originalStatus = item['status'] ?? '';
+                                final verificationStatus = item['verification_status'] ?? 'Pending';
+                                final status = verificationStatus == 'Rejected'
+                                    ? 'Absent'
+                                    : originalStatus;
                                 return Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                                   decoration: BoxDecoration(
@@ -340,55 +398,142 @@ class _VerifyAttendancePageState extends State<VerifyAttendancePage> {
                                           style: const TextStyle(fontSize: 11, color: Colors.black87),
                                         ),
                                       ),
-                                      Expanded(
+                                                                          Expanded(
                                         flex: 2,
-                                        child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                          decoration: BoxDecoration(
-                                            color: _statusBackgroundColor(status),
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                          child: Text(
-                                            status,
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w600,
-                                              color: _statusTextColor(status),
+                                        child: Center(
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                            decoration: BoxDecoration(
+                                              color: _statusBackgroundColor(status),
+                                              borderRadius: BorderRadius.circular(20),
+                                            ),
+                                            child: Text(
+                                              status,
+                                              textAlign: TextAlign.center,
+                                              style: TextStyle(
+                                                fontSize: 10,
+                                                fontWeight: FontWeight.w600,
+                                                color: _statusTextColor(status),
+                                              ),
                                             ),
                                           ),
                                         ),
                                       ),
                                       Expanded(
                                         flex: 3,
-                                        child: Column(
-                                          children: [
-                                            Container(
-                                              margin: const EdgeInsets.only(bottom: 4),
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFF4CAF50),
-                                                borderRadius: BorderRadius.circular(16),
+                                        child: verificationStatus == 'Pending'
+                                            ? Column(
+                                                children: [
+                                                  Material(
+                                                    color: Colors.transparent,
+                                                    child: InkWell(
+                                                      onTap: () async {
+                                                        final confirm = await showDialog<bool>(
+                                                          context: context,
+                                                          builder: (context) => AlertDialog(
+                                                            title: const Text('Confirm Approval'),
+                                                            content: const Text('Are you sure you want to approve this attendance?'),
+                                                            actions: [
+                                                              TextButton(
+                                                                onPressed: () => Navigator.of(context).pop(false),
+                                                                child: const Text('Cancel'),
+                                                              ),
+                                                              TextButton(
+                                                                onPressed: () => Navigator.of(context).pop(true),
+                                                                child: const Text('Approve'),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        );
+                                                        if (confirm == true) {
+                                                          final id = item['id'] ?? '';
+                                                          if (id.isNotEmpty) {
+                                                            updateAttendanceStatus(id, 'Approved');
+                                                          }
+                                                        }
+                                                      },
+                                                      borderRadius: BorderRadius.circular(16),
+                                                      child: Container(
+                                                        margin: const EdgeInsets.only(bottom: 4),
+                                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                                        decoration: BoxDecoration(
+                                                          color: const Color(0xFF4CAF50),
+                                                          borderRadius: BorderRadius.circular(16),
+                                                        ),
+                                                        child: const Text(
+                                                          'Approve',
+                                                          style: TextStyle(color: Colors.white, fontSize: 10),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                  Material(
+                                                    color: Colors.transparent,
+                                                    child: InkWell(
+                                                      onTap: () async {
+                                                        final confirm = await showDialog<bool>(
+                                                          context: context,
+                                                          builder: (context) => AlertDialog(
+                                                            title: const Text('Confirm Rejection'),
+                                                            content: const Text('Are you sure you want to reject this attendance?'),
+                                                            actions: [
+                                                              TextButton(
+                                                                onPressed: () => Navigator.of(context).pop(false),
+                                                                child: const Text('Cancel'),
+                                                              ),
+                                                              TextButton(
+                                                                onPressed: () => Navigator.of(context).pop(true),
+                                                                child: const Text('Reject'),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                        );
+                                                        if (confirm == true) {
+                                                          final id = item['id'] ?? '';
+                                                          if (id.isNotEmpty) {
+                                                            updateAttendanceStatus(id, 'Rejected');
+                                                          }
+                                                        }
+                                                      },
+                                                      borderRadius: BorderRadius.circular(16),
+                                                      child: Container(
+                                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                                        decoration: BoxDecoration(
+                                                          color: const Color(0xFFE74C3C),
+                                                          borderRadius: BorderRadius.circular(16),
+                                                        ),
+                                                        child: const Text(
+                                                          'Reject',
+                                                          style: TextStyle(color: Colors.white, fontSize: 10),
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                ],
+                                              )
+                                            : Center(
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                                  decoration: BoxDecoration(
+                                                    color: verificationStatus == 'Approved'
+                                                        ? const Color(0xFFE6F8EC)
+                                                        : const Color(0xFFFFE6E6),
+                                                    borderRadius: BorderRadius.circular(20),
+                                                  ),
+                                                  child: Text(
+                                                    verificationStatus,
+                                                    textAlign: TextAlign.center,
+                                                    style: TextStyle(
+                                                      fontSize: 10,
+                                                      fontWeight: FontWeight.w600,
+                                                      color: verificationStatus == 'Approved'
+                                                          ? const Color(0xFF2E7D32)
+                                                          : const Color(0xFFC62828),
+                                                    ),
+                                                  ),
+                                                ),
                                               ),
-                                              child: const Text(
-                                                'Approve',
-                                                style: TextStyle(color: Colors.white, fontSize: 10),
-                                              ),
-                                            ),
-                                            Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                              decoration: BoxDecoration(
-                                                color: const Color(0xFFE74C3C),
-                                                borderRadius: BorderRadius.circular(16),
-                                              ),
-                                              child: const Text(
-                                                'Reject',
-                                                style: TextStyle(color: Colors.white, fontSize: 10),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
+                                      )
                                     ],
                                   ),
                                 );

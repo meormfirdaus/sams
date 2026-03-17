@@ -4,6 +4,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'verify_attendance.dart';
+import 'view_attendance.dart';
 
 class AttendancePage extends StatefulWidget {
   final int classSessionId;
@@ -126,6 +127,7 @@ class _AttendancePageState extends State<AttendancePage> {
                     'matric': item['matric']?.toString() ?? '-',
                     'time': item['time']?.toString() ?? '-',
                     'status': item['status']?.toString() ?? 'Pending',
+                    'verification_status': item['verification_status']?.toString() ?? 'Pending',
                   })
               .toList();
         });
@@ -496,9 +498,24 @@ class _AttendancePageState extends State<AttendancePage> {
                         ),
                         const SizedBox(width: 14),
                         Expanded(
-                          child: _buildFeatureCard(
-                            icon: Icons.assignment_outlined,
-                            label: 'View Record History',
+                          child: GestureDetector(
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => ViewAttendancePage(
+                                    classSessionId: widget.classSessionId.toString(),
+                                    subjectName: '${widget.subjectCode} ${widget.subjectName}',
+                                    sessionLabel: 'Lecture Session - ${_formatClassDate(widget.classDate)}',
+                                    timeRange: '${_formatTime(widget.startTime)} - ${_formatTime(widget.endTime)}',
+                                  ),
+                                ),
+                              );
+                            },
+                            child: _buildFeatureCard(
+                              icon: Icons.assignment_outlined,
+                              label: 'View Record History',
+                            ),
                           ),
                         ),
                       ],
@@ -545,46 +562,57 @@ class _AttendancePageState extends State<AttendancePage> {
                             child: const Row(
                               children: [
                                 Expanded(
-                                  flex: 3,
-                                  child: Text(
-                                    'Name',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF6F7A8C),
+                                  flex: 4,
+                                  child: Padding(
+                                    padding: EdgeInsets.only(left: 4),
+                                    child: Text(
+                                      'Name',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF6F7A8C),
+                                      ),
                                     ),
                                   ),
                                 ),
                                 Expanded(
                                   flex: 2,
-                                  child: Text(
-                                    'Matric No.',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF6F7A8C),
+                                  child: Padding(
+                                    padding: EdgeInsets.only(left: 2),
+                                    child: Text(
+                                      'Matric No.',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF6F7A8C),
+                                      ),
                                     ),
                                   ),
                                 ),
                                 Expanded(
                                   flex: 2,
-                                  child: Text(
-                                    'Time',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF6F7A8C),
+                                  child: Padding(
+                                    padding: EdgeInsets.only(left: 2),
+                                    child: Text(
+                                      'Time',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF6F7A8C),
+                                      ),
                                     ),
                                   ),
                                 ),
                                 Expanded(
                                   flex: 2,
-                                  child: Text(
-                                    'Status',
-                                    style: TextStyle(
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w700,
-                                      color: Color(0xFF6F7A8C),
+                                  child: Center(
+                                    child: Text(
+                                      'Status',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w700,
+                                        color: Color(0xFF6F7A8C),
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -607,7 +635,11 @@ class _AttendancePageState extends State<AttendancePage> {
                           else
                             ...List.generate(submissions.length, (index) {
                               final item = submissions[index];
-                              final status = item['status'] ?? '';
+                              final originalStatus = item['status'] ?? '';
+                              final verificationStatus = item['verification_status'] ?? 'Pending';
+                              final status = verificationStatus == 'Rejected'
+                                  ? 'Absent'
+                                  : originalStatus;
                               return Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
                                 decoration: BoxDecoration(
@@ -622,40 +654,44 @@ class _AttendancePageState extends State<AttendancePage> {
                                   children: [
                                     Expanded(
                                       flex: 4,
-                                      child: Text(
-                                        item['name'] ?? '',
-                                        style: const TextStyle(fontSize: 10.5, color: Colors.black87),
+                                      child: Padding(
+                                        padding: const EdgeInsets.only(right: 8),
+                                        child: Text(
+                                          item['name'] ?? '',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(fontSize: 11.5, color: Colors.black87),
+                                        ),
                                       ),
                                     ),
                                     Expanded(
                                       flex: 2,
                                       child: Text(
                                         item['matric'] ?? '',
-                                        style: const TextStyle(fontSize: 10.5, color: Colors.black87),
+                                        style: const TextStyle(fontSize: 11.5, color: Colors.black87),
                                       ),
                                     ),
                                     Expanded(
                                       flex: 2,
                                       child: Text(
                                         item['time'] ?? '',
-                                        style: const TextStyle(fontSize: 10.5, color: Colors.black87),
+                                        style: const TextStyle(fontSize: 11.5, color: Colors.black87),
                                       ),
                                     ),
                                     Expanded(
                                       flex: 2,
-                                      child: Align(
-                                        alignment: Alignment.centerLeft,
+                                      child: Center(
                                         child: Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                                           decoration: BoxDecoration(
                                             color: _statusBackgroundColor(status),
-                                            borderRadius: BorderRadius.circular(12),
+                                            borderRadius: BorderRadius.circular(16),
                                           ),
                                           child: Text(
                                             status,
                                             style: TextStyle(
-                                              fontSize: 10,
-                                              fontWeight: FontWeight.w600,
+                                              fontSize: 10.5,
+                                              fontWeight: FontWeight.w700,
                                               color: _statusTextColor(status),
                                             ),
                                           ),

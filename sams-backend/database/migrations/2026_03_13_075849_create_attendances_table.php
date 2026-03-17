@@ -20,6 +20,11 @@ return new class extends Migration
 
             $table->enum('status', ['Present', 'Late', 'Absent'])->default('Present');
 
+            $table->decimal('latitude', 10, 7)->nullable();
+            $table->decimal('longitude', 10, 7)->nullable();
+            $table->string('location_name')->nullable();
+            $table->string('verification_status')->default('Pending');
+
             $table->timestamps();
 
             $table->foreign('student_id')->references('id')->on('users')->onDelete('cascade');

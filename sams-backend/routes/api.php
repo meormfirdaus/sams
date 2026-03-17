@@ -17,8 +17,10 @@ Route::get('/student/{studentId}/subjects', [StudentController::class, 'getRegis
 Route::get('/student/{studentId}/modules', [StudentController::class, 'getRegisteredModules']);
 Route::get('/student/{studentId}/info', [StudentController::class, 'getStudentInfo']);
 Route::get('/student/{studentId}/attendance/{subjectId}', [AttendanceController::class, 'getStudentAttendance']);
-
+Route::post('/attendance/{attendanceId}/status', [AttendanceController::class, 'updateAttendanceStatus']);
 Route::post(
     '/attendance/submit',
     [AttendanceController::class, 'submitAttendance']
 );
+Route::put('/attendance/records/{attendanceId}', [AttendanceController::class, 'updateAttendanceRecord']);
+Route::delete('/attendance/records/{attendanceId}', [AttendanceController::class, 'deleteAttendanceRecord']);
