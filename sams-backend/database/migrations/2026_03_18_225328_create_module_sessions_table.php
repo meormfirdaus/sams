@@ -10,12 +10,14 @@ return new class extends Migration {
         Schema::create('module_sessions', function (Blueprint $table) {
             $table->id();
             $table->unsignedBigInteger('module_id');
+            $table->unsignedBigInteger('lecturer_id');
             $table->date('class_date');
             $table->time('start_time');
             $table->time('end_time');
             $table->timestamps();
 
             $table->foreign('module_id')->references('id')->on('modules')->onDelete('cascade');
+            $table->foreign('lecturer_id')->references('id')->on('lecturers')->onDelete('cascade');
         });
     }
 
