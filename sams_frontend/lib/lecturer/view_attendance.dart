@@ -53,6 +53,7 @@ class ViewAttendancePage extends StatefulWidget {
   final String subjectName;
   final String sessionLabel;
   final String timeRange;
+  final String attendanceType;
   final List<AttendanceRecord> records;
   final ValueChanged<AttendanceRecord>? onEdit;
   final ValueChanged<AttendanceRecord>? onDelete;
@@ -64,6 +65,7 @@ class ViewAttendancePage extends StatefulWidget {
     required this.subjectName,
     required this.sessionLabel,
     required this.timeRange,
+    required this.attendanceType,
     this.records = const [],
     this.onEdit,
     this.onDelete,

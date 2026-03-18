@@ -63,6 +63,25 @@ class StudentController extends Controller
     }
 
     /**
+     * View course details (used when student clicks View Course button in Flutter).
+     */
+    public function viewCourse($moduleId)
+    {
+        $course = DB::table('modules')
+            ->where('id', $moduleId)
+            ->select('id', 'code', 'name')
+            ->first();
+
+        if (!$course) {
+            return response()->json([
+                'message' => 'Course not found'
+            ], 404);
+        }
+
+        return response()->json($course);
+    }
+
+    /**
      * Get student profile information.
      */
     public function getStudentInfo($studentId)

@@ -36,7 +36,7 @@ class _MainNavigationState extends State<MainNavigation> {
               _currentIndex = index;
             });
           },
-          selectedItemColor: const Color(0xFF2E4E96),
+          selectedItemColor: const Color(0xFF67C5C4),
           unselectedItemColor: Colors.grey,
           type: BottomNavigationBarType.fixed,
           items: const [

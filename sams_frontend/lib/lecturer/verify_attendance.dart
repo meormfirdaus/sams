@@ -12,6 +12,7 @@ class VerifyAttendancePage extends StatefulWidget {
   final String classDate;
   final String startTime;
   final String endTime;
+  final String attendanceType;
 
   const VerifyAttendancePage({
     super.key,
@@ -21,6 +22,7 @@ class VerifyAttendancePage extends StatefulWidget {
     required this.classDate,
     required this.startTime,
     required this.endTime,
+    required this.attendanceType,
   });
 
   @override

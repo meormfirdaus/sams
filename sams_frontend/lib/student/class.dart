@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sams_frontend/student/attendance.dart';
+import 'package:sams_frontend/student/view_course.dart';
 
 class StudentClassPage extends StatefulWidget {
   const StudentClassPage({super.key});
@@ -101,7 +102,7 @@ class _StudentClassPageState extends State<StudentClassPage> {
                     'module_id': item['module_id'],
                     'code': item['code']?.toString() ?? '',
                     'name': item['name']?.toString() ?? '',
-                    'attendanceEnabled': false,
+                    'attendanceEnabled': true,
                   })
               .toList();
 
@@ -142,6 +143,7 @@ class _StudentClassPageState extends State<StudentClassPage> {
                   color: Colors.white,
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
+                  fontFamily: 'Nunito',
                 ),
               ),
             ),
@@ -164,6 +166,7 @@ class _StudentClassPageState extends State<StudentClassPage> {
                                 fontSize: 17,
                                 fontWeight: FontWeight.w700,
                                 color: Colors.black87,
+                                fontFamily: 'Nunito',
                               ),
                             ),
                             const SizedBox(height: 12),
@@ -180,6 +183,7 @@ class _StudentClassPageState extends State<StudentClassPage> {
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: Color(0xFF5F6570),
+                                    fontFamily: 'Nunito',
                                   ),
                                 ),
                               )
@@ -192,6 +196,7 @@ class _StudentClassPageState extends State<StudentClassPage> {
                                     code: item['code'] as String,
                                     name: item['name'] as String,
                                     attendanceEnabled: item['attendanceEnabled'] as bool,
+                                    attendanceType: 'course',
                                   ),
                                 ),
                               ),
@@ -202,6 +207,7 @@ class _StudentClassPageState extends State<StudentClassPage> {
                                 fontSize: 17,
                                 fontWeight: FontWeight.w700,
                                 color: Colors.black87,
+                                fontFamily: 'Nunito',
                               ),
                             ),
                             const SizedBox(height: 12),
@@ -218,6 +224,7 @@ class _StudentClassPageState extends State<StudentClassPage> {
                                   style: TextStyle(
                                     fontSize: 14,
                                     color: Color(0xFF5F6570),
+                                    fontFamily: 'Nunito',
                                   ),
                                 ),
                               )
@@ -226,10 +233,11 @@ class _StudentClassPageState extends State<StudentClassPage> {
                                 (item) => Padding(
                                   padding: const EdgeInsets.only(bottom: 14),
                                   child: _buildBookingCard(
-                                    subjectId: int.tryParse(item['id'].toString()) ?? 0,
+                                    subjectId: int.tryParse(item['module_id'].toString()) ?? 0,
                                     code: item['code'] as String,
                                     name: item['name'] as String,
                                     attendanceEnabled: item['attendanceEnabled'] as bool,
+                                    attendanceType: 'module',
                                   ),
                                 ),
                               ),
@@ -250,6 +258,7 @@ class _StudentClassPageState extends State<StudentClassPage> {
     required String code,
     required String name,
     required bool attendanceEnabled,
+    required String attendanceType,
   }) {
     return Container(
       width: double.infinity,
@@ -294,6 +303,7 @@ class _StudentClassPageState extends State<StudentClassPage> {
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                     color: Colors.black87,
+                    fontFamily: 'Nunito',
                   ),
                 ),
                 const SizedBox(height: 4),
@@ -304,6 +314,7 @@ class _StudentClassPageState extends State<StudentClassPage> {
                     fontSize: 15,
                     color: Colors.black87,
                     height: 1.25,
+                    fontFamily: 'Nunito',
                   ),
                 ),
                 const SizedBox(height: 18),
@@ -315,26 +326,34 @@ class _StudentClassPageState extends State<StudentClassPage> {
                     _buildActionButton(
                       label: 'View Course',
                       isEnabled: true,
-                      onPressed: () {},
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const ViewCoursePage(),
+                          ),
+                        );
+                      },
                     ),
                     _buildActionButton(
                       label: 'Submit Attendance',
                       isEnabled: attendanceEnabled,
-                    onPressed: attendanceEnabled
-    ? () {
-       Navigator.push(
-  context,
-  MaterialPageRoute(
-    builder: (context) => StudentAttendancePage(
-      studentId: studentId,
-      subjectId: subjectId,
-      subjectCode: code,
-      subjectName: name,
-    ),
-  ),
-);
-      }
-    : null,
+                      onPressed: attendanceEnabled
+                          ? () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => StudentAttendancePage(
+                                    studentId: studentId,
+                                    subjectId: subjectId,
+                                    subjectCode: code,
+                                    subjectName: name,
+                                    attendanceType: attendanceType,
+                                  ),
+                                ),
+                              );
+                            }
+                          : null,
                     ),
                   ],
                 ),
@@ -375,6 +394,7 @@ class _StudentClassPageState extends State<StudentClassPage> {
           style: const TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
+            fontFamily: 'Nunito',
           ),
         ),
       ),

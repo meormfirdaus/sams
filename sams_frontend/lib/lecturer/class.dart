@@ -17,7 +17,8 @@ class _ClassPageState extends State<ClassPage> {
   bool isLoading = true;
   int lecturerId = 0;
   List<Map<String, String>> allClassSessions = [];
-Map<String, List<Map<String, String>>> courseSessionsMap = {};
+  Map<String, List<Map<String, String>>> courseSessionsMap = {};
+  Map<String, List<Map<String, String>>> moduleSessionsMap = {};
 
   @override
   void initState() {
@@ -48,6 +49,8 @@ Map<String, List<Map<String, String>>> courseSessionsMap = {};
         isLoading = false;
         courses = [];
         modules = [];
+        courseSessionsMap = {};
+        moduleSessionsMap = {};
       });
       debugPrint('No lecturer_id found in session');
       return;
@@ -63,66 +66,131 @@ Map<String, List<Map<String, String>>> courseSessionsMap = {};
         debugPrint('Lecturer classes API success: ${response.body}');
         final List data = json.decode(response.body);
 
-        final List<Map<String, String>> sessionData = data
-            .map<Map<String, String>>((item) => {
-                  'id': item['id'].toString(),
-                  'code': item['subject_code']?.toString() ?? '',
-                  'name': item['subject_name']?.toString() ?? '',
-                  'class_date': item['class_date']?.toString() ?? '',
-                  'start_time': item['start_time']?.toString() ?? '',
-                  'end_time': item['end_time']?.toString() ?? '',
-                })
-            .toList();
-
+        final List<Map<String, String>> courseSessionData = [];
+        final List<Map<String, String>> moduleSessionData = [];
         final Map<String, Map<String, String>> uniqueCourses = {};
-        for (final item in sessionData) {
-          final key = '${item['code']}|${item['name']}';
-          uniqueCourses.putIfAbsent(
-            key,
-            () => {
-              'code': item['code'] ?? '',
-              'name': item['name'] ?? '',
-            },
-          );
+        final Map<String, Map<String, String>> uniqueModules = {};
+        final Map<String, List<Map<String, String>>> groupedCourseSessions = {};
+        final Map<String, List<Map<String, String>>> groupedModuleSessions = {};
+
+        for (final rawItem in data) {
+          final Map<String, dynamic> item = Map<String, dynamic>.from(rawItem as Map);
+
+          final subjectCode = item['subject_code']?.toString() ?? item['code']?.toString() ?? '';
+          final subjectName = item['subject_name']?.toString() ?? item['name']?.toString() ?? '';
+          final moduleCode = item['module_code']?.toString() ?? item['code']?.toString() ?? '';
+          final moduleName = item['module_name']?.toString() ?? item['name']?.toString() ?? '';
+          final attendanceType = item['attendance_type']?.toString().toLowerCase() ??
+              item['type']?.toString().toLowerCase() ?? '';
+          final hasModuleId = item['module_id'] != null && item['module_id'].toString().isNotEmpty;
+          final hasSubjectId = item['subject_id'] != null && item['subject_id'].toString().isNotEmpty;
+
+          final bool isModuleItem = attendanceType == 'module' ||
+              hasModuleId ||
+              (moduleCode.isNotEmpty && !hasSubjectId) ||
+              (moduleName.isNotEmpty && !hasSubjectId);
+          final String code = isModuleItem
+              ? (moduleCode.isNotEmpty ? moduleCode : subjectCode)
+              : subjectCode;
+          final String name = isModuleItem
+              ? (moduleName.isNotEmpty ? moduleName : subjectName)
+              : subjectName;
+          final String sessionId = item['id']?.toString() ??
+              item['session_id']?.toString() ?? '';
+
+          final sessionMap = {
+            'id': sessionId,
+            'code': code,
+            'name': name,
+            'class_date': item['class_date']?.toString() ?? '',
+            'start_time': item['start_time']?.toString() ?? '',
+            'end_time': item['end_time']?.toString() ?? '',
+            'attendance_type': isModuleItem ? 'module' : 'course',
+            'module_id': item['module_id']?.toString() ?? '',
+            'subject_id': item['subject_id']?.toString() ?? '',
+          };
+
+          if (isModuleItem) {
+            moduleSessionData.add(sessionMap);
+
+            final key = '${code}|${name}';
+            uniqueModules.putIfAbsent(
+              key,
+              () => {
+                'code': code,
+                'name': name,
+                'attendance_type': 'module',
+              },
+            );
+
+            final normalizedCode = code.trim().toUpperCase();
+            groupedModuleSessions.putIfAbsent(normalizedCode, () => []);
+            groupedModuleSessions[normalizedCode]!.add(sessionMap);
+          } else {
+            courseSessionData.add(sessionMap);
+
+            final key = '${code}|${name}';
+            uniqueCourses.putIfAbsent(
+              key,
+              () => {
+                'code': code,
+                'name': name,
+                'attendance_type': 'course',
+              },
+            );
+
+            final normalizedCode = code.trim().toUpperCase();
+            groupedCourseSessions.putIfAbsent(normalizedCode, () => []);
+            groupedCourseSessions[normalizedCode]!.add(sessionMap);
+          }
         }
+        debugPrint('Parsed courses count: ${uniqueCourses.length}');
+        debugPrint('Parsed modules count: ${uniqueModules.length}');
+        debugPrint('Grouped module session keys: ${groupedModuleSessions.keys.toList()}');
 
-        final Map<String, List<Map<String, String>>> groupedSessions = {};
-for (final item in sessionData) {
-  final courseCode = (item['code'] ?? '').trim().toUpperCase();
-  groupedSessions.putIfAbsent(courseCode, () => []);
-  groupedSessions[courseCode]!.add(item);
-}
-
-       setState(() {
-  allClassSessions = sessionData;
-  courseSessionsMap = groupedSessions;
-  courses = uniqueCourses.values.toList();
-  modules = [];
-  isLoading = false;
-});
+        setState(() {
+          allClassSessions = [...courseSessionData, ...moduleSessionData];
+          courseSessionsMap = groupedCourseSessions;
+          moduleSessionsMap = groupedModuleSessions;
+          courses = uniqueCourses.values.toList();
+          modules = uniqueModules.values.toList();
+          isLoading = false;
+        });
       } else {
         debugPrint('Lecturer classes API failed: ${response.statusCode}');
         debugPrint('Lecturer classes API body: ${response.body}');
         setState(() {
+          courses = [];
+          modules = [];
+          courseSessionsMap = {};
+          moduleSessionsMap = {};
           isLoading = false;
         });
       }
     } catch (e) {
       debugPrint('Error fetching lecturer classes: $e');
       setState(() {
+        courses = [];
+        modules = [];
+        courseSessionsMap = {};
+        moduleSessionsMap = {};
         isLoading = false;
       });
     }
   }
 
   void _showCourseSessions(Map<String, String> course) {
-   final selectedCode = (course['code'] ?? '').trim().toUpperCase();
-final sessions = List<Map<String, String>>.from(
-  courseSessionsMap[selectedCode] ?? <Map<String, String>>[],
-);
+    final selectedCode = (course['code'] ?? '').trim().toUpperCase();
+    final attendanceType = course['attendance_type'] ?? 'course';
+    final sessions = List<Map<String, String>>.from(
+      attendanceType == 'module'
+          ? (moduleSessionsMap[selectedCode] ?? <Map<String, String>>[])
+          : (courseSessionsMap[selectedCode] ?? <Map<String, String>>[]),
+    );
 
-debugPrint('Selected course code: $selectedCode');
-debugPrint('Mapped sessions count: ${sessions.length}');
+    debugPrint('Selected code: $selectedCode');
+    debugPrint('Attendance type: $attendanceType');
+    debugPrint('Mapped sessions count: ${sessions.length}');
 
     showModalBottomSheet(
       context: context,
@@ -191,6 +259,7 @@ debugPrint('Mapped sessions count: ${sessions.length}');
                                 classDate: session['class_date'] ?? '',
                                 startTime: session['start_time'] ?? '',
                                 endTime: session['end_time'] ?? '',
+                                attendanceType: session['attendance_type'] ?? attendanceType,
                               ),
                             ),
                           );

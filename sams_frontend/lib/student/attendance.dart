@@ -10,6 +10,7 @@ class StudentAttendancePage extends StatefulWidget {
   final int subjectId;
   final String subjectCode;
   final String subjectName;
+  final String attendanceType;
 
   const StudentAttendancePage({
     super.key,
@@ -17,6 +18,7 @@ class StudentAttendancePage extends StatefulWidget {
     required this.subjectId,
     required this.subjectCode,
     required this.subjectName,
+    required this.attendanceType,
   });
 
   @override
@@ -68,7 +70,10 @@ class _StudentAttendancePageState extends State<StudentAttendancePage> {
 
     sessionStudentId = savedStudentId ?? savedUserId;
 
-    debugPrint('StudentAttendancePage loaded studentId: ${sessionStudentId ?? widget.studentId}');
+    debugPrint(
+      'StudentAttendancePage loaded studentId: ${sessionStudentId ?? widget.studentId}, '
+      'subjectId: ${widget.subjectId}, attendanceType: ${widget.attendanceType}',
+    );
 
     fetchAttendanceData();
   }
@@ -82,7 +87,7 @@ class _StudentAttendancePageState extends State<StudentAttendancePage> {
       final response = await http
           .get(
             Uri.parse(
-              'http://10.0.2.2:8000/api/student/${sessionStudentId ?? widget.studentId}/attendance/${widget.subjectId}',
+              'http://10.0.2.2:8000/api/student/${sessionStudentId ?? widget.studentId}/attendance/${widget.subjectId}?type=${widget.attendanceType}',
             ),
           )
           .timeout(const Duration(seconds: 10));
@@ -120,6 +125,16 @@ class _StudentAttendancePageState extends State<StudentAttendancePage> {
           currentSessionTime =
               data['current_session_time']?.toString() ?? '-';
           activeCode = data['active_code']?.toString() ?? '-';
+
+          if (widget.attendanceType == 'module') {
+            final cleanedTitle = currentSessionTitle
+                .replaceFirst('Lecture Session', 'Module Session')
+                .replaceFirst('lecture session', 'Module Session');
+
+            currentSessionTitle = cleanedTitle == '-' || cleanedTitle.trim().isEmpty
+                ? 'Module Session'
+                : cleanedTitle;
+          }
 
           recentRecords = records;
           isLoading = false;
@@ -215,6 +230,8 @@ class _StudentAttendancePageState extends State<StudentAttendancePage> {
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'student_id': studentId,
+          'subject_id': widget.subjectId,
+          'attendance_type': widget.attendanceType,
           'code': enteredCode,
           'latitude': locationData.latitude,
           'longitude': locationData.longitude,
@@ -456,32 +473,43 @@ class _StudentAttendancePageState extends State<StudentAttendancePage> {
                             ),
                             child: Column(
                               children: [
-                                Text(
-                                  currentSessionTitle,
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.black87,
+                                if (widget.attendanceType == 'module') ...[
+                                  Text(
+                                    currentSessionTitle,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.black87,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  currentSessionDate,
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.black87,
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    currentSessionTime,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.black87,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  currentSessionTime,
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.black87,
+                                ] else ...[
+                                  Text(
+                                    currentSessionTitle,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.black87,
+                                    ),
                                   ),
-                                ),
+                                  const SizedBox(height: 6),
+                                  Text(
+                                    currentSessionTime,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                      fontSize: 14,
+                                      color: Colors.black87,
+                                    ),
+                                  ),
+                                ],
                                 const SizedBox(height: 14),
                                 Container(
                                   width: double.infinity,

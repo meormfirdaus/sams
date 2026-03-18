@@ -13,6 +13,7 @@ class AttendancePage extends StatefulWidget {
   final String classDate;
   final String startTime;
   final String endTime;
+  final String attendanceType;
 
   const AttendancePage({
     super.key,
@@ -22,6 +23,7 @@ class AttendancePage extends StatefulWidget {
     required this.classDate,
     required this.startTime,
     required this.endTime,
+    required this.attendanceType,
   });
 
   @override
@@ -114,7 +116,7 @@ class _AttendancePageState extends State<AttendancePage> {
     try {
       final response = await http
           .get(
-            Uri.parse('http://10.0.2.2:8000/api/attendance/${widget.classSessionId}/submissions'),
+            Uri.parse('http://10.0.2.2:8000/api/attendance/${widget.classSessionId}/submissions?type=${widget.attendanceType}'),
           )
           .timeout(const Duration(seconds: 10));
 
@@ -157,7 +159,11 @@ class _AttendancePageState extends State<AttendancePage> {
               'Content-Type': 'application/json',
             },
             body: jsonEncode({
-              'class_session_id': widget.classSessionId,
+              if (widget.attendanceType == 'module')
+                'module_session_id': widget.classSessionId
+              else
+                'class_session_id': widget.classSessionId,
+              'attendance_type': widget.attendanceType,
             }),
           )
           .timeout(const Duration(seconds: 10));
@@ -486,6 +492,7 @@ class _AttendancePageState extends State<AttendancePage> {
                                     classDate: widget.classDate,
                                     startTime: widget.startTime,
                                     endTime: widget.endTime,
+                                    attendanceType: widget.attendanceType,
                                   ),
                                 ),
                               );
@@ -506,8 +513,9 @@ class _AttendancePageState extends State<AttendancePage> {
                                   builder: (context) => ViewAttendancePage(
                                     classSessionId: widget.classSessionId.toString(),
                                     subjectName: '${widget.subjectCode} ${widget.subjectName}',
-                                    sessionLabel: 'Lecture Session - ${_formatClassDate(widget.classDate)}',
+                                    sessionLabel: '${widget.attendanceType == 'module' ? 'Module' : 'Lecture'} Session - ${_formatClassDate(widget.classDate)}',
                                     timeRange: '${_formatTime(widget.startTime)} - ${_formatTime(widget.endTime)}',
+                                    attendanceType: widget.attendanceType,
                                   ),
                                 ),
                               );

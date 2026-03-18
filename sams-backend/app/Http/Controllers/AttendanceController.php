@@ -5,6 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\AttendanceCode;
 use App\Models\Attendance;
 use App\Models\ClassSession;
+use App\Models\ModuleSession;
+use App\Models\ModuleAttendanceCode;
+use App\Models\ModuleAttendance;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -20,10 +23,28 @@ class AttendanceController extends Controller
     public function generateCode(Request $request)
     {
         $request->validate([
-            'class_session_id' => 'required|exists:class_sessions,id',
+            'attendance_type' => 'nullable|in:course,module',
+            'class_session_id' => 'nullable|exists:class_sessions,id',
+            'module_session_id' => 'nullable|exists:module_sessions,id',
         ]);
 
-        $classSession = ClassSession::findOrFail($request->class_session_id);
+        $attendanceType = $request->input('attendance_type', 'course');
+        $isModule = $attendanceType === 'module';
+        $sessionIdField = $isModule ? 'module_session_id' : 'class_session_id';
+        $codeModel = $isModule ? ModuleAttendanceCode::class : AttendanceCode::class;
+        $sessionModel = $isModule ? ModuleSession::class : ClassSession::class;
+
+        $sessionId = $request->input($sessionIdField);
+
+        if (!$sessionId) {
+            return response()->json([
+                'message' => $isModule
+                    ? 'module_session_id is required for module attendance.'
+                    : 'class_session_id is required for course attendance.',
+            ], 422);
+        }
+
+        $classSession = $sessionModel::findOrFail($sessionId);
 
         $now = Carbon::now();
         $classStart = Carbon::parse($classSession->class_date . ' ' . $classSession->start_time);
@@ -40,16 +61,17 @@ class AttendanceController extends Controller
 
         $code = Str::upper(Str::random(6));
 
-        $attendanceCode = AttendanceCode::create([
-            'class_session_id' => $request->class_session_id,
+        $attendanceCode = $codeModel::create([
+            $sessionIdField => $sessionId,
             'code' => $code,
             'expires_at' => $classEnd,
         ]);
 
         return response()->json([
             'message' => 'Attendance code generated successfully',
+            'attendance_type' => $attendanceType,
             'attendance_code' => $attendanceCode->code,
-            'class_session_id' => $attendanceCode->class_session_id,
+            $sessionIdField => $attendanceCode->{$sessionIdField},
             'expires_at' => $attendanceCode->expires_at,
         ]);
     }
@@ -57,22 +79,27 @@ class AttendanceController extends Controller
     /**
      * Get attendance submissions for a class session.
      */
-    public function getSubmissions($classSessionId)
+    public function getSubmissions(Request $request, $classSessionId)
     {
-        $submissions = DB::table('attendances')
-            ->leftJoin('students', 'attendances.student_id', '=', 'students.id')
+        $attendanceType = $request->query('type', 'course');
+        $isModule = $attendanceType === 'module';
+        $attendanceTable = $isModule ? 'module_attendances' : 'attendances';
+        $sessionForeignKey = $isModule ? 'module_session_id' : 'class_session_id';
+
+        $submissions = DB::table($attendanceTable)
+            ->leftJoin('students', $attendanceTable . '.student_id', '=', 'students.id')
             ->leftJoin('users', 'students.user_id', '=', 'users.id')
-            ->where('attendances.class_session_id', $classSessionId)
+            ->where($attendanceTable . '.' . $sessionForeignKey, $classSessionId)
             ->select(
-                'attendances.id',
-                'attendances.status',
-                'attendances.verification_status',
-                'attendances.location_name',
-                'attendances.created_at as submitted_at',
+                $attendanceTable . '.id',
+                $attendanceTable . '.status',
+                $attendanceTable . '.verification_status',
+                $attendanceTable . '.location_name',
+                $attendanceTable . '.created_at as submitted_at',
                 DB::raw("COALESCE(users.name, 'Unknown Student') as student_name"),
                 DB::raw("COALESCE(students.matric_no, '-') as matric_no")
             )
-            ->orderBy('attendances.created_at')
+            ->orderBy($attendanceTable . '.created_at')
             ->get()
             ->map(function ($item) {
                 return [
@@ -94,8 +121,16 @@ class AttendanceController extends Controller
     /**
      * Get attendance dashboard data for a student and subject.
      */
-    public function getStudentAttendance($studentId, $subjectId)
+    public function getStudentAttendance(Request $request, $studentId, $subjectId)
     {
+        $attendanceType = $request->query('type', 'course');
+        $isModule = $attendanceType === 'module';
+        $sessionTable = $isModule ? 'module_sessions' : 'class_sessions';
+        $attendanceTable = $isModule ? 'module_attendances' : 'attendances';
+        $sessionForeignKey = $isModule ? 'module_session_id' : 'class_session_id';
+        $sessionColumn = $isModule ? 'module_id' : 'subject_id';
+        $codeModel = $isModule ? ModuleAttendanceCode::class : AttendanceCode::class;
+
         $student = DB::table('students')
             ->join('users', 'students.user_id', '=', 'users.id')
             ->where('students.id', $studentId)
@@ -106,13 +141,13 @@ class AttendanceController extends Controller
             )
             ->first();
 
-        $sessions = DB::table('class_sessions')
-            ->where('subject_id', $subjectId)
+        $sessions = DB::table($sessionTable)
+            ->where($sessionColumn, $subjectId)
             ->pluck('id');
 
-        $records = DB::table('attendances')
+        $records = DB::table($attendanceTable)
             ->where('student_id', $studentId)
-            ->whereIn('class_session_id', $sessions)
+            ->whereIn($sessionForeignKey, $sessions)
             ->get();
 
         $present = $records
@@ -134,19 +169,21 @@ class AttendanceController extends Controller
             ? round(($attended / $totalClasses) * 100) . '%'
             : '0%';
 
-        $recentRecords = DB::table('attendances')
-            ->join('class_sessions', 'attendances.class_session_id', '=', 'class_sessions.id')
-            ->where('attendances.student_id', $studentId)
-            ->where('class_sessions.subject_id', $subjectId)
+        $recentRecords = DB::table($attendanceTable)
+            ->join($sessionTable, $attendanceTable . '.' . $sessionForeignKey, '=', $sessionTable . '.id')
+            ->where($attendanceTable . '.student_id', $studentId)
+            ->where($sessionTable . '.' . $sessionColumn, $subjectId)
             ->select(
-                'class_sessions.id',
-                'class_sessions.class_date',
-                'class_sessions.start_time',
-                'attendances.status',
-                'attendances.verification_status',
-                'attendances.created_at'
+                $sessionTable . '.id',
+                $sessionTable . '.class_date',
+                $sessionTable . '.start_time',
+                $sessionTable . '.session_type',
+                $sessionTable . '.week_number',
+                $attendanceTable . '.status',
+                $attendanceTable . '.verification_status',
+                $attendanceTable . '.created_at'
             )
-            ->orderByDesc('class_sessions.class_date')
+            ->orderByDesc($sessionTable . '.class_date')
             ->limit(10)
             ->get()
             ->map(function ($item) {
@@ -154,8 +191,13 @@ class AttendanceController extends Controller
                     ? 'Absent'
                     : $item->status;
 
+                $sessionType = ucfirst(strtolower($item->session_type ?? 'Lecture'));
+                $label = $sessionType;
+
+                $weekNumber = $item->week_number ?? $item->id;
+
                 return [
-                    'session' => 'Lecture W' . $item->id,
+                    'session' => $label . ' Week ' . $weekNumber,
                     'date' => Carbon::parse($item->class_date)->format('j F Y'),
                     'time' => $item->created_at
                         ? Carbon::parse($item->created_at)->format('g:i a')
@@ -164,16 +206,30 @@ class AttendanceController extends Controller
                 ];
             });
 
-        $currentSession = DB::table('class_sessions')
-            ->where('subject_id', $subjectId)
-            ->orderByDesc('class_date')
-            ->orderByDesc('start_time')
-            ->first();
+        $now = Carbon::now();
+
+        $currentSession = DB::table($sessionTable)
+            ->where($sessionColumn, $subjectId)
+            ->orderBy('class_date')
+            ->orderBy('start_time')
+            ->get()
+            ->first(function ($session) use ($now) {
+                $sessionEnd = Carbon::parse($session->class_date . ' ' . $session->end_time);
+                return $sessionEnd->gte($now);
+            });
+
+        if (!$currentSession) {
+            $currentSession = DB::table($sessionTable)
+                ->where($sessionColumn, $subjectId)
+                ->orderByDesc('class_date')
+                ->orderByDesc('start_time')
+                ->first();
+        }
 
         $activeCode = null;
         if ($currentSession) {
-            $activeCode = AttendanceCode::where('class_session_id', $currentSession->id)
-                ->where('expires_at', '>', Carbon::now())
+            $activeCode = $codeModel::where($sessionForeignKey, $currentSession->id)
+                ->where('expires_at', '>', $now)
                 ->latest()
                 ->first();
         }
@@ -189,7 +245,7 @@ class AttendanceController extends Controller
             'total_classes' => $totalClasses,
             'attendance_rate' => $attendanceRate,
             'current_session_title' => $currentSession
-                ? 'Lecture Session - ' . Carbon::parse($currentSession->class_date)->format('l, j F Y')
+                ? ucfirst(strtolower($currentSession->session_type ?? 'Lecture')) . ' Session - ' . Carbon::parse($currentSession->class_date)->format('l, j F Y')
                 : '-',
             'current_session_date' => $currentSession
                 ? Carbon::parse($currentSession->class_date)->format('j F Y')
@@ -209,12 +265,21 @@ class AttendanceController extends Controller
     {
         $request->validate([
             'student_id' => 'required|exists:students,id',
+            'subject_id' => 'required|integer',
+            'attendance_type' => 'required|in:course,module',
             'code' => 'required',
             'latitude' => 'nullable|numeric',
             'longitude' => 'nullable|numeric',
         ]);
 
-        $attendanceCode = AttendanceCode::where('code', Str::upper($request->code))
+        $isModule = $request->attendance_type === 'module';
+        $codeModel = $isModule ? ModuleAttendanceCode::class : AttendanceCode::class;
+        $sessionModel = $isModule ? ModuleSession::class : ClassSession::class;
+        $attendanceTable = $isModule ? 'module_attendances' : 'attendances';
+        $sessionForeignKey = $isModule ? 'module_session_id' : 'class_session_id';
+        $sessionColumn = $isModule ? 'module_id' : 'subject_id';
+
+        $attendanceCode = $codeModel::where('code', Str::upper($request->code))
             ->where('expires_at', '>', Carbon::now())
             ->first();
 
@@ -224,9 +289,17 @@ class AttendanceController extends Controller
             ], 422);
         }
 
-        $alreadySubmitted = DB::table('attendances')
+        $session = $sessionModel::find($attendanceCode->{$sessionForeignKey});
+
+        if (!$session || $session->{$sessionColumn} != $request->subject_id) {
+            return response()->json([
+                'message' => 'Attendance code does not match the selected class',
+            ], 422);
+        }
+
+        $alreadySubmitted = DB::table($attendanceTable)
             ->where('student_id', $request->student_id)
-            ->where('class_session_id', $attendanceCode->class_session_id)
+            ->where($sessionForeignKey, $attendanceCode->{$sessionForeignKey})
             ->exists();
 
         if ($alreadySubmitted) {
@@ -235,7 +308,6 @@ class AttendanceController extends Controller
             ], 422);
         }
 
-        $session = ClassSession::find($attendanceCode->class_session_id);
         $now = Carbon::now();
         $classStart = Carbon::parse($session->class_date . ' ' . $session->start_time);
         $lateThreshold = (clone $classStart)->addMinutes(15);
@@ -252,29 +324,31 @@ class AttendanceController extends Controller
 
         $attendanceData = [
             'student_id' => $request->student_id,
-            'class_session_id' => $attendanceCode->class_session_id,
+            $sessionForeignKey => $attendanceCode->{$sessionForeignKey},
             'status' => $status,
             'created_at' => Carbon::now(),
             'updated_at' => Carbon::now(),
         ];
 
-        if (Schema::hasColumn('attendances', 'latitude')) {
+        if (Schema::hasColumn($attendanceTable, 'latitude')) {
             $attendanceData['latitude'] = $latitude;
         }
 
-        if (Schema::hasColumn('attendances', 'longitude')) {
+        if (Schema::hasColumn($attendanceTable, 'longitude')) {
             $attendanceData['longitude'] = $longitude;
         }
 
-        if (Schema::hasColumn('attendances', 'location_name')) {
+        if (Schema::hasColumn($attendanceTable, 'location_name')) {
             $attendanceData['location_name'] = $locationName;
         }
 
-        DB::table('attendances')->insert($attendanceData);
+        DB::table($attendanceTable)->insert($attendanceData);
 
         return response()->json([
             'message' => 'Attendance submitted successfully',
             'status' => $status,
+            'attendance_type' => $request->attendance_type,
+            'subject_id' => $request->subject_id,
             'location_name' => $locationName ?? 'Location verified successfully',
         ]);
     }
@@ -285,10 +359,14 @@ class AttendanceController extends Controller
     public function updateAttendanceStatus(Request $request, $attendanceId)
     {
         $request->validate([
-            'status' => 'required|in:Approved,Rejected'
+            'status' => 'required|in:Approved,Rejected',
+            'attendance_type' => 'nullable|in:course,module',
         ]);
 
-        $attendance = DB::table('attendances')
+        $attendanceType = $request->input('attendance_type', 'course');
+        $attendanceTable = $attendanceType === 'module' ? 'module_attendances' : 'attendances';
+
+        $attendance = DB::table($attendanceTable)
             ->where('id', $attendanceId)
             ->first();
 
@@ -298,7 +376,7 @@ class AttendanceController extends Controller
             ], 404);
         }
 
-        DB::table('attendances')
+        DB::table($attendanceTable)
             ->where('id', $attendanceId)
             ->update([
                 'verification_status' => $request->status,
@@ -318,10 +396,14 @@ class AttendanceController extends Controller
     public function updateAttendanceRecord(Request $request, $attendanceId)
     {
         $request->validate([
-            'status' => 'required|in:Present,Late,Absent'
+            'status' => 'required|in:Present,Late,Absent',
+            'attendance_type' => 'nullable|in:course,module',
         ]);
 
-        $attendance = DB::table('attendances')
+        $attendanceType = $request->input('attendance_type', 'course');
+        $attendanceTable = $attendanceType === 'module' ? 'module_attendances' : 'attendances';
+
+        $attendance = DB::table($attendanceTable)
             ->where('id', $attendanceId)
             ->first();
 
@@ -335,7 +417,7 @@ class AttendanceController extends Controller
             ? 'Rejected'
             : 'Approved';
 
-        DB::table('attendances')
+        DB::table($attendanceTable)
             ->where('id', $attendanceId)
             ->update([
                 'status' => $request->status,
@@ -354,9 +436,12 @@ class AttendanceController extends Controller
     /**
      * Lecturer deletes a student's attendance record from the history page.
      */
-    public function deleteAttendanceRecord($attendanceId)
+    public function deleteAttendanceRecord(Request $request, $attendanceId)
     {
-        $attendance = DB::table('attendances')
+        $attendanceType = $request->input('attendance_type', $request->query('attendance_type', 'course'));
+        $attendanceTable = $attendanceType === 'module' ? 'module_attendances' : 'attendances';
+
+        $attendance = DB::table($attendanceTable)
             ->where('id', $attendanceId)
             ->first();
 
@@ -366,7 +451,7 @@ class AttendanceController extends Controller
             ], 404);
         }
 
-        DB::table('attendances')
+        DB::table($attendanceTable)
             ->where('id', $attendanceId)
             ->delete();
 
