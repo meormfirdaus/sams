@@ -51,10 +51,6 @@ class _MainNavigationState extends State<MainNavigation> {
               icon: Icon(Icons.menu_book_outlined),
               label: "Class",
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.payments_outlined),
-              label: "Payment",
-            ),
           ],
           iconSize: 30,
         ),

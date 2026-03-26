@@ -35,7 +35,7 @@ class ViewCoursePage extends StatelessWidget {
     return Scaffold(
       backgroundColor: const Color(0xFFF7F7F7),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF3CB4AC),
+        backgroundColor: const Color(0xFF67C5C4),
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
         title: const Text(

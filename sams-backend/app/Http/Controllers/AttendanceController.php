@@ -3,11 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\AttendanceCode;
-use App\Models\Attendance;
 use App\Models\ClassSession;
 use App\Models\ModuleSession;
 use App\Models\ModuleAttendanceCode;
-use App\Models\ModuleAttendance;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -484,5 +482,168 @@ class AttendanceController extends Controller
         $location = explode(',', $data['display_name'])[0];
 
         return $location;
+    }
+
+    /**
+     * Get classes (course + module) assigned to a lecturer
+     */
+    public function getLecturerClasses($lecturerId)
+    {
+        $courseClasses = ClassSession::with('subject')
+            ->where('lecturer_id', $lecturerId)
+            ->orderBy('class_date')
+            ->orderBy('start_time')
+            ->get()
+            ->map(function ($class) {
+                return [
+                    'id' => $class->id,
+                    'subject_id' => $class->subject_id,
+                    'subject_code' => $class->subject->code ?? '',
+                    'subject_name' => $class->subject->name ?? '',
+                    'class_date' => $class->class_date,
+                    'start_time' => $class->start_time,
+                    'end_time' => $class->end_time,
+                    'session_type' => $class->session_type ?? '',
+                    'week_number' => $class->week_number ?? '',
+                    'attendance_type' => 'course',
+                ];
+            });
+
+        $moduleClasses = DB::table('module_sessions')
+            ->join('modules', 'module_sessions.module_id', '=', 'modules.id')
+            ->where('module_sessions.lecturer_id', $lecturerId)
+            ->orderBy('module_sessions.class_date')
+            ->orderBy('module_sessions.start_time')
+            ->select(
+                'module_sessions.id',
+                'module_sessions.module_id',
+                'module_sessions.class_date',
+                'module_sessions.start_time',
+                'module_sessions.end_time',
+                'module_sessions.session_type',
+                'module_sessions.week_number',
+                'modules.code as module_code',
+                'modules.name as module_name'
+            )
+            ->get()
+            ->map(function ($class) {
+                return [
+                    'id' => $class->id,
+                    'module_id' => $class->module_id,
+                    'module_code' => $class->module_code,
+                    'module_name' => $class->module_name,
+                    'class_date' => $class->class_date,
+                    'start_time' => $class->start_time,
+                    'end_time' => $class->end_time,
+                    'session_type' => $class->session_type ?? '',
+                    'week_number' => $class->week_number ?? '',
+                    'attendance_type' => 'module',
+                ];
+            });
+
+        return response()->json(
+            $courseClasses->concat($moduleClasses)->values()
+        );
+    }
+
+    /**
+     * Get subjects registered by a student
+     */
+    public function getRegisteredSubjects($studentId)
+    {
+        $registrations = DB::table('subject_registrations')
+            ->join('subjects', 'subject_registrations.subject_id', '=', 'subjects.id')
+            ->where('subject_registrations.student_id', $studentId)
+            ->select(
+                'subject_registrations.id',
+                'subject_registrations.student_id',
+                'subject_registrations.subject_id',
+                'subjects.code',
+                'subjects.name'
+            )
+            ->orderBy('subjects.code')
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'subject_id' => $item->subject_id,
+                    'code' => $item->code,
+                    'name' => $item->name,
+                ];
+            });
+
+        return response()->json($registrations);
+    }
+
+    /**
+     * Get modules registered by a student
+     */
+    public function getRegisteredModules($studentId)
+    {
+        $modules = DB::table('module_registrations')
+            ->join('modules', 'module_registrations.module_id', '=', 'modules.id')
+            ->where('module_registrations.student_id', $studentId)
+            ->select(
+                'module_registrations.id',
+                'module_registrations.student_id',
+                'module_registrations.module_id',
+                'modules.code',
+                'modules.name'
+            )
+            ->orderBy('modules.code')
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'id' => $item->id,
+                    'module_id' => $item->module_id,
+                    'code' => $item->code,
+                    'name' => $item->name,
+                ];
+            });
+
+        return response()->json($modules);
+    }
+
+    /**
+     * View course/module details
+     */
+    public function viewCourse($moduleId)
+    {
+        $course = DB::table('modules')
+            ->where('id', $moduleId)
+            ->select('id', 'code', 'name')
+            ->first();
+
+        if (!$course) {
+            return response()->json([
+                'message' => 'Course not found'
+            ], 404);
+        }
+
+        return response()->json($course);
+    }
+
+    /**
+     * Get student profile
+     */
+    public function getStudentInfo($studentId)
+    {
+        $student = DB::table('students')
+            ->join('users', 'students.user_id', '=', 'users.id')
+            ->where('students.id', $studentId)
+            ->select(
+                'users.name',
+                'students.matric_no as matric',
+                'students.programme as program'
+            )
+            ->first();
+
+        if (!$student) {
+            return response()->json([
+                'message' => 'Student not found'
+            ], 404);
+        }
+
+        return response()->json($student);
     }
 }

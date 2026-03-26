@@ -105,6 +105,8 @@ class _ClassPageState extends State<ClassPage> {
             'class_date': item['class_date']?.toString() ?? '',
             'start_time': item['start_time']?.toString() ?? '',
             'end_time': item['end_time']?.toString() ?? '',
+            'session_type': item['session_type']?.toString() ?? '',
+            'week_number': item['week_number']?.toString() ?? '',
             'attendance_type': isModuleItem ? 'module' : 'course',
             'module_id': item['module_id']?.toString() ?? '',
             'subject_id': item['subject_id']?.toString() ?? '',
@@ -231,19 +233,40 @@ class _ClassPageState extends State<ClassPage> {
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                         title: Text(
-                          session['class_date'] ?? '-',
+                          _formatDisplayDate(session['class_date'] ?? '-'),
                           style: const TextStyle(
                             fontWeight: FontWeight.w700,
-                            fontSize: 14,
+                            fontSize: 15,
+                            color: Colors.black87,
                           ),
                         ),
                         subtitle: Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text(
-                            '${session['start_time'] ?? '-'} - ${session['end_time'] ?? '-'}',
-                            style: const TextStyle(fontSize: 12),
+                          padding: const EdgeInsets.only(top: 8),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                _buildSessionLabel(session),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: Color(0xFF2E4E96),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                _formatTimeRange(
+                                  session['start_time'] ?? '-',
+                                  session['end_time'] ?? '-',
+                                ),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.black54,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         trailing: const Icon(Icons.arrow_forward_ios, size: 16),
@@ -273,6 +296,58 @@ class _ClassPageState extends State<ClassPage> {
         );
       },
     );
+  }
+
+  String _formatDisplayDate(String rawDate) {
+    if (rawDate.isEmpty || rawDate == '-') return '-';
+
+    try {
+      final date = DateTime.parse(rawDate);
+      const months = [
+        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+      ];
+      return '${date.day} ${months[date.month - 1]} ${date.year}';
+    } catch (_) {
+      return rawDate;
+    }
+  }
+
+  String _formatTimeValue(String rawTime) {
+    if (rawTime.isEmpty || rawTime == '-') return '-';
+
+    try {
+      final parts = rawTime.split(':');
+      if (parts.length < 2) return rawTime;
+
+      final hour = int.tryParse(parts[0]) ?? 0;
+      final minute = int.tryParse(parts[1]) ?? 0;
+      final suffix = hour >= 12 ? 'PM' : 'AM';
+      final displayHour = hour % 12 == 0 ? 12 : hour % 12;
+      final displayMinute = minute.toString().padLeft(2, '0');
+      return '$displayHour:$displayMinute $suffix';
+    } catch (_) {
+      return rawTime;
+    }
+  }
+
+  String _formatTimeRange(String startTime, String endTime) {
+    return '${_formatTimeValue(startTime)} - ${_formatTimeValue(endTime)}';
+  }
+
+  String _buildSessionLabel(Map<String, String> session) {
+    final rawType = (session['session_type'] ?? '').trim();
+    final rawWeek = (session['week_number'] ?? '').trim();
+
+    final sessionType = rawType.isEmpty
+        ? (session['attendance_type'] == 'module' ? 'Module Session' : 'Session')
+        : '${rawType[0].toUpperCase()}${rawType.substring(1).toLowerCase()} Session';
+
+    if (rawWeek.isEmpty) {
+      return sessionType;
+    }
+
+    return '$sessionType • Week $rawWeek';
   }
 
   @override
