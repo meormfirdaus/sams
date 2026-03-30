@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\AttendanceCode;
 use App\Models\ClassSession;
-use App\Models\ModuleSession;
+use App\Models\ModuleSchedule;
 use App\Models\ModuleAttendanceCode;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -23,14 +23,14 @@ class AttendanceController extends Controller
         $request->validate([
             'attendance_type' => 'nullable|in:course,module',
             'class_session_id' => 'nullable|exists:class_sessions,id',
-            'module_session_id' => 'nullable|exists:module_sessions,id',
+            'module_session_id' => 'nullable|exists:module_schedules,id',
         ]);
 
         $attendanceType = $request->input('attendance_type', 'course');
         $isModule = $attendanceType === 'module';
         $sessionIdField = $isModule ? 'module_session_id' : 'class_session_id';
         $codeModel = $isModule ? ModuleAttendanceCode::class : AttendanceCode::class;
-        $sessionModel = $isModule ? ModuleSession::class : ClassSession::class;
+        $sessionModel = $isModule ? ModuleSchedule::class : ClassSession::class;
 
         $sessionId = $request->input($sessionIdField);
 
@@ -121,9 +121,16 @@ class AttendanceController extends Controller
      */
     public function getStudentAttendance(Request $request, $studentId, $subjectId)
     {
+        $studentId = $this->resolveStudentId($studentId);
+
+        if (!$studentId) {
+            return response()->json([
+                'message' => 'Student record not found',
+            ], 404);
+        }
         $attendanceType = $request->query('type', 'course');
         $isModule = $attendanceType === 'module';
-        $sessionTable = $isModule ? 'module_sessions' : 'class_sessions';
+        $sessionTable = $isModule ? 'module_schedules' : 'class_sessions';
         $attendanceTable = $isModule ? 'module_attendances' : 'attendances';
         $sessionForeignKey = $isModule ? 'module_session_id' : 'class_session_id';
         $sessionColumn = $isModule ? 'module_id' : 'subject_id';
@@ -225,7 +232,9 @@ class AttendanceController extends Controller
         }
 
         $activeCode = null;
-        if ($currentSession) {
+        $codeTableExists = !$isModule || Schema::hasTable('module_attendance_codes');
+
+        if ($currentSession && $codeTableExists) {
             $activeCode = $codeModel::where($sessionForeignKey, $currentSession->id)
                 ->where('expires_at', '>', $now)
                 ->latest()
@@ -233,9 +242,9 @@ class AttendanceController extends Controller
         }
 
         return response()->json([
-            'student_name' => $student->student_name ?? '-',
-            'matric_number' => $student->matric_number ?? '-',
-            'programme' => $student->programme ?? '-',
+            'student_name' => $student?->student_name ?? '-',
+            'matric_number' => $student?->matric_number ?? '-',
+            'programme' => $student?->programme ?? '-',
             'present_count' => $present,
             'late_count' => $late,
             'absent_count' => $absent,
@@ -270,9 +279,17 @@ class AttendanceController extends Controller
             'longitude' => 'nullable|numeric',
         ]);
 
+        $resolvedStudentId = $this->resolveStudentId($request->student_id);
+
+        if (!$resolvedStudentId) {
+            return response()->json([
+                'message' => 'Student record not found',
+            ], 404);
+        }
+
         $isModule = $request->attendance_type === 'module';
         $codeModel = $isModule ? ModuleAttendanceCode::class : AttendanceCode::class;
-        $sessionModel = $isModule ? ModuleSession::class : ClassSession::class;
+        $sessionModel = $isModule ? ModuleSchedule::class : ClassSession::class;
         $attendanceTable = $isModule ? 'module_attendances' : 'attendances';
         $sessionForeignKey = $isModule ? 'module_session_id' : 'class_session_id';
         $sessionColumn = $isModule ? 'module_id' : 'subject_id';
@@ -296,7 +313,7 @@ class AttendanceController extends Controller
         }
 
         $alreadySubmitted = DB::table($attendanceTable)
-            ->where('student_id', $request->student_id)
+            ->where('student_id', $resolvedStudentId)
             ->where($sessionForeignKey, $attendanceCode->{$sessionForeignKey})
             ->exists();
 
@@ -321,7 +338,7 @@ class AttendanceController extends Controller
         }
 
         $attendanceData = [
-            'student_id' => $request->student_id,
+            'student_id' => $resolvedStudentId,
             $sessionForeignKey => $attendanceCode->{$sessionForeignKey},
             'status' => $status,
             'created_at' => Carbon::now(),
@@ -509,19 +526,19 @@ class AttendanceController extends Controller
                 ];
             });
 
-        $moduleClasses = DB::table('module_sessions')
-            ->join('modules', 'module_sessions.module_id', '=', 'modules.id')
-            ->where('module_sessions.lecturer_id', $lecturerId)
-            ->orderBy('module_sessions.class_date')
-            ->orderBy('module_sessions.start_time')
+        $moduleClasses = DB::table('module_schedules')
+            ->join('modules', 'module_schedules.module_id', '=', 'modules.id')
+            ->where('module_schedules.lecturer_id', $lecturerId)
+            ->orderBy('module_schedules.class_date')
+            ->orderBy('module_schedules.start_time')
             ->select(
-                'module_sessions.id',
-                'module_sessions.module_id',
-                'module_sessions.class_date',
-                'module_sessions.start_time',
-                'module_sessions.end_time',
-                'module_sessions.session_type',
-                'module_sessions.week_number',
+                'module_schedules.id',
+                'module_schedules.module_id',
+                'module_schedules.class_date',
+                'module_schedules.start_time',
+                'module_schedules.end_time',
+                'module_schedules.session_type',
+                'module_schedules.week_number',
                 'modules.code as module_code',
                 'modules.name as module_name'
             )
@@ -551,6 +568,12 @@ class AttendanceController extends Controller
      */
     public function getRegisteredSubjects($studentId)
     {
+        $studentId = $this->resolveStudentId($studentId);
+
+        if (!$studentId) {
+            return response()->json([]);
+        }
+
         $registrations = DB::table('subject_registrations')
             ->join('subjects', 'subject_registrations.subject_id', '=', 'subjects.id')
             ->where('subject_registrations.student_id', $studentId)
@@ -580,6 +603,12 @@ class AttendanceController extends Controller
      */
     public function getRegisteredModules($studentId)
     {
+        $studentId = $this->resolveStudentId($studentId);
+
+        if (!$studentId) {
+            return response()->json([]);
+        }
+
         $modules = DB::table('module_registrations')
             ->join('modules', 'module_registrations.module_id', '=', 'modules.id')
             ->where('module_registrations.student_id', $studentId)
@@ -628,6 +657,14 @@ class AttendanceController extends Controller
      */
     public function getStudentInfo($studentId)
     {
+        $studentId = $this->resolveStudentId($studentId);
+
+        if (!$studentId) {
+            return response()->json([
+                'message' => 'Student not found'
+            ], 404);
+        }
+
         $student = DB::table('students')
             ->join('users', 'students.user_id', '=', 'users.id')
             ->where('students.id', $studentId)
@@ -645,5 +682,45 @@ class AttendanceController extends Controller
         }
 
         return response()->json($student);
+    }
+    private function resolveStudentId($incomingStudentId): ?int
+    {
+        if (!$incomingStudentId) {
+            return null;
+        }
+
+        $incomingStudentId = (int) $incomingStudentId;
+
+        $directStudentId = DB::table('students')
+            ->where('id', $incomingStudentId)
+            ->value('id');
+
+        if ($directStudentId) {
+            return (int) $directStudentId;
+        }
+
+        $studentByUserId = DB::table('students')
+            ->where('user_id', $incomingStudentId)
+            ->value('id');
+
+        if ($studentByUserId) {
+            return (int) $studentByUserId;
+        }
+
+        $user = DB::table('users')
+            ->where('id', $incomingStudentId)
+            ->first();
+
+        if ($user && !empty($user->matric_number)) {
+            $studentByMatric = DB::table('students')
+                ->where('matric_no', $user->matric_number)
+                ->value('id');
+
+            if ($studentByMatric) {
+                return (int) $studentByMatric;
+            }
+        }
+
+        return null;
     }
 }

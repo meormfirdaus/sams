@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'module_model.dart';
 
 
@@ -22,11 +23,23 @@ class _AvailableClassesPageState extends State<AvailableClassesPage> {
   bool _isLoading = true;
   String _errorMessage = '';
   List<dynamic> _schedules = [];
+  int? _resolvedStudentId;
 
   @override
   void initState() {
     super.initState();
-    fetchSchedules();
+    _loadStudentIdAndFetchSchedules();
+  }
+
+  Future<void> _loadStudentIdAndFetchSchedules() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedStudentId = prefs.getInt('student_id');
+
+    setState(() {
+      _resolvedStudentId = savedStudentId ?? widget.studentId;
+    });
+
+    await fetchSchedules();
   }
 
   Future<void> fetchSchedules() async {
@@ -57,6 +70,7 @@ class _AvailableClassesPageState extends State<AvailableClassesPage> {
   }
 
   Future<void> bookSchedule(int scheduleId) async {
+    final studentId = _resolvedStudentId ?? widget.studentId;
     try {
       final response = await http.post(
         Uri.parse('http://10.0.2.2:8000/api/modules/book'),
@@ -65,7 +79,7 @@ class _AvailableClassesPageState extends State<AvailableClassesPage> {
           'Accept': 'application/json',
         },
         body: jsonEncode({
-          'student_id': widget.studentId,
+          'student_id': studentId,
           'module_id': widget.module.id,
           'module_schedule_id': scheduleId,
         }),
@@ -200,6 +214,7 @@ class _AvailableClassesPageState extends State<AvailableClassesPage> {
                             final bool isFull =
                                 item['status'] == 'full' ||
                                 ((item['booked_count'] ?? 0) >= (item['capacity'] ?? 0));
+                            final bool studentMissing = (_resolvedStudentId ?? widget.studentId) <= 0;
 
                             return Container(
                               margin: const EdgeInsets.only(bottom: 16),
@@ -255,7 +270,7 @@ class _AvailableClassesPageState extends State<AvailableClassesPage> {
                                   ),
                                   const SizedBox(height: 12),
                                   InkWell(
-                                    onTap: isFull
+                                    onTap: isFull || studentMissing
                                         ? null
                                         : () {
                                             bookSchedule(item['id']);
@@ -264,11 +279,15 @@ class _AvailableClassesPageState extends State<AvailableClassesPage> {
                                       width: double.infinity,
                                       padding: const EdgeInsets.symmetric(vertical: 10),
                                       decoration: BoxDecoration(
-                                        color: primaryColor,
+                                        color: isFull
+                                            ? Colors.grey
+                                            : (studentMissing ? Colors.grey : primaryColor),
                                         borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Text(
-                                        isFull ? 'Full Capacity' : 'Book Now',
+                                        studentMissing
+                                            ? 'Student session not found'
+                                            : (isFull ? 'Full Capacity' : 'Book Now'),
                                         textAlign: TextAlign.center,
                                         style: const TextStyle(
                                           color: Colors.white,

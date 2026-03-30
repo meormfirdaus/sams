@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'module_model.dart';
 import 'available_classes_page.dart';
 
@@ -18,12 +19,24 @@ class _BookNowPageState extends State<BookNowPage> {
   List<ModuleModel> _filteredModules = [];
   bool _isLoading = true;
   String _errorMessage = '';
+  int? _studentId;
 
   @override
   void initState() {
     super.initState();
-    fetchModules();
     _searchController.addListener(_filterModules);
+    _loadStudentIdAndFetchModules();
+  }
+
+  Future<void> _loadStudentIdAndFetchModules() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedStudentId = prefs.getInt('student_id');
+
+    setState(() {
+      _studentId = savedStudentId;
+    });
+
+    await fetchModules();
   }
 
   @override
@@ -170,7 +183,10 @@ class _BookNowPageState extends State<BookNowPage> {
                             ),
                             const SizedBox(height: 16),
                             ..._filteredModules.map(
-                              (module) => ModuleCard(module: module),
+                              (module) => ModuleCard(
+                                module: module,
+                                studentId: _studentId,
+                              ),
                             ),
                           ],
                         ),
@@ -184,8 +200,13 @@ class _BookNowPageState extends State<BookNowPage> {
 
 class ModuleCard extends StatelessWidget {
   final ModuleModel module;
+  final int? studentId;
 
-  const ModuleCard({super.key, required this.module});
+  const ModuleCard({
+    super.key,
+    required this.module,
+    required this.studentId,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -231,7 +252,7 @@ class ModuleCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           InkWell(
-            onTap: module.booked
+            onTap: module.booked || studentId == null
                 ? null
                 : () {
                     Navigator.push(
@@ -239,7 +260,7 @@ class ModuleCard extends StatelessWidget {
                       MaterialPageRoute(
                         builder: (context) => AvailableClassesPage(
                           module: module,
-                          studentId: 2,
+                          studentId: studentId!,
                         ),
                       ),
                     );
@@ -248,13 +269,15 @@ class ModuleCard extends StatelessWidget {
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 10),
               decoration: BoxDecoration(
-                color: module.booked ? Colors.red : primaryColor,
+                color: module.booked
+                    ? Colors.red
+                    : (studentId == null ? Colors.grey : primaryColor),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
                 module.booked
                     ? 'Booked class date: ${module.bookedClassDate ?? "-"}'
-                    : 'View Date Available',
+                    : (studentId == null ? 'Student session not found' : 'View Date Available'),
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: Colors.white,
