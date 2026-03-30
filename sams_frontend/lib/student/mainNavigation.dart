@@ -2,6 +2,8 @@
 import 'package:flutter/material.dart';
 import 'homepage.dart';
 import 'class.dart';
+import 'curriculum_page.dart';
+
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -15,7 +17,7 @@ class _MainNavigationState extends State<MainNavigation> {
 
   final List<Widget> _pages = const [
     StudentHomepage(),
-    Placeholder(), // Curriculum page (create later)
+    CurriculumPage(), // Curriculum page 
     StudentClassPage(),
     Placeholder(), // Payment page (create later)
   ];

@@ -30,7 +30,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-
+ 
   shared_preferences: ^2.2.2
   cupertino_icons: ^1.0.8
   http: ^1.2.1
@@ -74,7 +74,11 @@ flutter:
   assets:
     - assets/images/class_teaching.png
     - assets/images/booked_course.png
-
+    - assets/images/module_booking.png
+    - assets/images/credit_claim.png
+    - assets/images/activities.png
+    - assets/images/book_now.png
+    - assets/images/my_booking.png
   fonts:
     - family: Nunito
       fonts:

@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AttendanceController;
+use App\Http\Controllers\Api\ModuleController;
 
 
 
@@ -24,4 +25,7 @@ Route::post(
 Route::put('/attendance/records/{attendanceId}', [AttendanceController::class, 'updateAttendanceRecord']);
 Route::delete('/attendance/records/{attendanceId}', [AttendanceController::class, 'deleteAttendanceRecord']);
 
-//
+//meor
+Route::get('/modules', [ModuleController::class, 'index']);
+Route::get('/modules/{id}/schedules', [ModuleController::class, 'schedules']);
+Route::post('/modules/book', [ModuleController::class, 'book']);

@@ -53,8 +53,8 @@ class ViewCoursePage extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: const [
+            const Row(
+              children: [
                 Icon(Icons.keyboard_arrow_down, size: 34, color: Colors.black87),
                 SizedBox(width: 8),
                 Expanded(

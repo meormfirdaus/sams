@@ -115,7 +115,7 @@ class _ClassPageState extends State<ClassPage> {
           if (isModuleItem) {
             moduleSessionData.add(sessionMap);
 
-            final key = '${code}|${name}';
+            final key = '$code|$name';
             uniqueModules.putIfAbsent(
               key,
               () => {
@@ -131,7 +131,7 @@ class _ClassPageState extends State<ClassPage> {
           } else {
             courseSessionData.add(sessionMap);
 
-            final key = '${code}|${name}';
+            final key = '$code|$name';
             uniqueCourses.putIfAbsent(
               key,
               () => {
