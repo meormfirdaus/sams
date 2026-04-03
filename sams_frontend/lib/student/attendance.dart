@@ -54,7 +54,7 @@ class _StudentAttendancePageState extends State<StudentAttendancePage> {
 
   String get _normalizedAttendanceType {
     final type = widget.attendanceType.trim().toLowerCase();
-    return type == 'module' ? 'module' : 'class';
+    return type == 'module' ? 'module' : 'course';
   }
 
   bool _hasMeaningfulAttendanceData(Map<String, dynamic> data) {
@@ -305,7 +305,10 @@ class _StudentAttendancePageState extends State<StudentAttendancePage> {
 
       final response = await http.post(
         Uri.parse('http://10.0.2.2:8000/api/attendance/submit'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
         body: jsonEncode({
           'student_id': studentId,
           'subject_id': widget.subjectId,
@@ -316,7 +319,21 @@ class _StudentAttendancePageState extends State<StudentAttendancePage> {
         }),
       );
 
-      final data = json.decode(response.body) as Map<String, dynamic>;
+      debugPrint('SUBMIT ATTENDANCE status => ${response.statusCode}');
+      debugPrint('SUBMIT ATTENDANCE body => ${response.body}');
+
+      Map<String, dynamic> data = {};
+      if (response.body.isNotEmpty) {
+        try {
+          data = json.decode(response.body) as Map<String, dynamic>;
+        } catch (_) {
+          data = {
+            'message': response.statusCode >= 500
+                ? 'Server error while submitting attendance.'
+                : 'Unexpected server response while submitting attendance.',
+          };
+        }
+      }
 
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -334,10 +351,7 @@ class _StudentAttendancePageState extends State<StudentAttendancePage> {
         );
       }
     } catch (e) {
-      setState(() {
-        isGpsVerified = false;
-        gpsStatusText = 'GPS check failed';
-      });
+      debugPrint('SUBMIT ATTENDANCE error => $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Connection error: $e')),
       );
