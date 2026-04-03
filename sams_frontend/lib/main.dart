@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sams_frontend/lecturer/mainNavigation.dart' as lecturer_nav;
 import 'package:sams_frontend/student/mainNavigation.dart' as student_nav;
+import 'package:sams_frontend/treasurer/dashboard_page.dart' as treasurer_page;
 
 void main() {
   runApp(const SAMSApp());
@@ -33,7 +34,6 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-
   final TextEditingController idController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
 
@@ -51,6 +51,27 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> login() async {
     String id = idController.text.trim().toUpperCase();
     String password = passwordController.text.trim();
+
+    String apiRole;
+    switch ((selectedRole ?? '').trim().toLowerCase()) {
+      case 'student':
+        apiRole = 'student';
+        break;
+      case 'lecturer':
+        apiRole = 'lecturer';
+        break;
+      case 'treasury':
+        apiRole = 'treasury';
+        break;
+      case 'faculty registrar':
+        apiRole = 'faculty_registrar';
+        break;
+      case 'pusat adab':
+        apiRole = 'pusat_adab';
+        break;
+      default:
+        apiRole = (selectedRole ?? '').trim().toLowerCase();
+    }
 
     if (id.isEmpty || password.isEmpty || selectedRole == null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -70,11 +91,11 @@ class _LoginPageState extends State<LoginPage> {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
-     body: jsonEncode({
-  'id_number': id,
-  'password': password,
-  'role': selectedRole,
-}),
+        body: jsonEncode({
+          'id_number': id,
+          'password': password,
+          'role': apiRole,
+        }),
       ).timeout(const Duration(seconds: 10));
 
       final Map<String, dynamic> data = response.body.isNotEmpty
@@ -87,7 +108,7 @@ class _LoginPageState extends State<LoginPage> {
         final prefs = await SharedPreferences.getInstance();
 
         await prefs.setString('login_id', id);
-        await prefs.setString('role', (data['role'] ?? selectedRole!).toString());
+        await prefs.setString('role', (data['role'] ?? apiRole).toString());
 
         if (data['user_id'] != null) {
           await prefs.setInt('user_id', int.tryParse(data['user_id'].toString()) ?? 0);
@@ -111,20 +132,37 @@ class _LoginPageState extends State<LoginPage> {
           await prefs.remove('lecturer_id');
         }
 
-        final resolvedRole = (data['role'] ?? selectedRole!).toString();
+        if (data['treasurer_id'] != null) {
+          final parsedTreasurerId = int.tryParse(data['treasurer_id'].toString());
+          if (parsedTreasurerId != null) {
+            await prefs.setInt('treasurer_id', parsedTreasurerId);
+          }
+        } else {
+          await prefs.remove('treasurer_id');
+        }
 
-        if (resolvedRole.toLowerCase() == 'lecturer') {
+        final resolvedRole = (data['role'] ?? apiRole).toString().trim();
+        final normalizedRole = resolvedRole.toLowerCase();
+
+        if (normalizedRole == 'lecturer') {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
               builder: (context) => const lecturer_nav.MainNavigation(),
             ),
           );
-        } else if (resolvedRole.toLowerCase() == 'student') {
+        } else if (normalizedRole == 'student') {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
               builder: (context) => const student_nav.MainNavigation(),
+            ),
+          );
+        } else if (normalizedRole == 'treasury' || normalizedRole == 'treasurer') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const treasurer_page.DashboardPage(),
             ),
           );
         } else {
@@ -167,7 +205,6 @@ class _LoginPageState extends State<LoginPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-
             const Text(
               "SA Management System",
               style: TextStyle(
@@ -175,21 +212,17 @@ class _LoginPageState extends State<LoginPage> {
                 fontWeight: FontWeight.bold,
               ),
             ),
-
             const SizedBox(height: 40),
-
             TextField(
               controller: idController,
               textCapitalization: TextCapitalization.characters,
               decoration: const InputDecoration(
-                labelText: "User ID / Matric ID / Staff ID",
-                hintText: "Example: CB23017",
+                labelText: "Matric ID / Staff ID",
+                hintText: "Example: CB23017 / STF001",
                 border: OutlineInputBorder(),
               ),
             ),
-
             const SizedBox(height: 20),
-
             DropdownButtonFormField<String>(
               value: selectedRole,
               decoration: const InputDecoration(
@@ -208,9 +241,7 @@ class _LoginPageState extends State<LoginPage> {
                 });
               },
             ),
-
             const SizedBox(height: 20),
-
             TextField(
               controller: passwordController,
               obscureText: true,
@@ -219,9 +250,7 @@ class _LoginPageState extends State<LoginPage> {
                 border: OutlineInputBorder(),
               ),
             ),
-
             const SizedBox(height: 30),
-
             SizedBox(
               width: double.infinity,
               child: ElevatedButton(

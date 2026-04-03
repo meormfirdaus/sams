@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\DB;
 class AuthController extends Controller
 {
     /**
-     * Basic login for all actors (student, lecturer, etc.)
+     * Basic login for all actors (student, lecturer, treasury, etc.)
      */
     public function login(Request $request)
     {
@@ -80,6 +80,37 @@ class AuthController extends Controller
                 'student_id' => null,
                 'lecturer_id' => $lecturer->lecturer_id,
                 'name' => $lecturer->name,
+            ]);
+        }
+
+        if ($role === 'treasury' || $role === 'treasurer') {
+            $treasurer = DB::table('treasurers')
+                ->join('users', 'treasurers.user_id', '=', 'users.id')
+                ->where('treasurers.staff_id', $loginId)
+                ->whereIn(DB::raw('LOWER(users.role)'), ['treasury', 'treasurer'])
+                ->select(
+                    'users.id as user_id',
+                    'users.name',
+                    'users.password',
+                    'users.role',
+                    'treasurers.id as treasurer_id'
+                )
+                ->first();
+
+            if (!$treasurer || !Hash::check($request->password, $treasurer->password)) {
+                return response()->json([
+                    'message' => 'Invalid credentials'
+                ], 401);
+            }
+
+            return response()->json([
+                'message' => 'Login successful',
+                'user_id' => $treasurer->user_id,
+                'role' => $treasurer->role,
+                'student_id' => null,
+                'lecturer_id' => null,
+                'treasurer_id' => $treasurer->treasurer_id,
+                'name' => $treasurer->name,
             ]);
         }
 

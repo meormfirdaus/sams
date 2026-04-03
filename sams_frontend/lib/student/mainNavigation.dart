@@ -2,7 +2,9 @@
 import 'package:flutter/material.dart';
 import 'homepage.dart';
 import 'class.dart';
+
 import 'curriculum_page.dart';
+import 'fee_dashboard.dart';
 
 
 class MainNavigation extends StatefulWidget {
@@ -16,19 +18,16 @@ class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
 
   final List<Widget> _pages = const [
-    StudentHomepage(),
-    CurriculumPage(), // Curriculum page 
-    StudentClassPage(),
-    Placeholder(), // Payment page (create later)
+    const StudentHomepage(),
+    const CurriculumPage(), // Curriculum page
+    const StudentClassPage(),
+    const FeeDashboardPage(),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _pages,
-      ),
+      body: _pages[_currentIndex],
       bottomNavigationBar: SizedBox(
         height: 85,
         child: BottomNavigationBar(
