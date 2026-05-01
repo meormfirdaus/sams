@@ -577,6 +577,7 @@ class AttendanceController extends Controller
         $registrations = DB::table('subject_registrations')
             ->join('subjects', 'subject_registrations.subject_id', '=', 'subjects.id')
             ->where('subject_registrations.student_id', $studentId)
+            ->where('subject_registrations.approval_status', 'Approved')
             ->select(
                 'subject_registrations.id',
                 'subject_registrations.student_id',
@@ -665,15 +666,21 @@ class AttendanceController extends Controller
             ], 404);
         }
 
-        $student = DB::table('students')
+        $query = DB::table('students')
             ->join('users', 'students.user_id', '=', 'users.id')
-            ->where('students.id', $studentId)
-            ->select(
+            ->where('students.id', $studentId);
+
+        $selects = [
                 'users.name',
                 'students.matric_no as matric',
-                'students.programme as program'
-            )
-            ->first();
+                'students.programme as program',
+        ];
+
+        if (Schema::hasColumn('students', 'advisor')) {
+            $selects[] = 'students.advisor';
+        }
+
+        $student = $query->select($selects)->first();
 
         if (!$student) {
             return response()->json([

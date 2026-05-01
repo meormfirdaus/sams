@@ -72,13 +72,15 @@ flutter:
   #   - images/a_dot_ham.jpeg
 
   assets:
-    - assets/images/class_teaching.png
-    - assets/images/booked_course.png
-    - assets/images/module_booking.png
-    - assets/images/credit_claim.png
-    - assets/images/activities.png
-    - assets/images/book_now.png
-    - assets/images/my_booking.png
+    - assets/images/
+    # - assets/images/logoumpsa.png 
+    # - assets/images/class_teaching.png
+    # - assets/images/booked_course.png
+    # - assets/images/module_booking.png
+    # - assets/images/credit_claim.png
+    # - assets/images/activities.png
+    # - assets/images/book_now.png
+    # - assets/images/my_booking.png
   fonts:
     - family: Nunito
       fonts:
