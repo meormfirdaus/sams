@@ -114,11 +114,18 @@ class _AttendancePageState extends State<AttendancePage> {
     });
 
     try {
+      debugPrint('FETCH SUBMISSIONS => classSessionId: ${widget.classSessionId}');
+      debugPrint('FETCH SUBMISSIONS => attendanceType: ${widget.attendanceType}');
+      debugPrint(
+        'FETCH SUBMISSIONS URL => http://10.0.2.2:8000/api/attendance/${widget.classSessionId}/submissions?type=${widget.attendanceType}',
+      );
       final response = await http
           .get(
             Uri.parse('http://10.0.2.2:8000/api/attendance/${widget.classSessionId}/submissions?type=${widget.attendanceType}'),
           )
           .timeout(const Duration(seconds: 10));
+      debugPrint('FETCH SUBMISSIONS status => ${response.statusCode}');
+      debugPrint('FETCH SUBMISSIONS body => ${response.body}');
 
       if (response.statusCode == 200) {
         final List data = json.decode(response.body);
@@ -134,8 +141,8 @@ class _AttendancePageState extends State<AttendancePage> {
               .toList();
         });
       }
-    } catch (_) {
-      // keep page usable even if submissions fail to load
+    } catch (e) {
+      debugPrint('FETCH SUBMISSIONS error => $e');
     } finally {
       if (mounted) {
         setState(() {
@@ -152,6 +159,17 @@ class _AttendancePageState extends State<AttendancePage> {
     });
 
     try {
+      debugPrint('GENERATE CODE => classSessionId: ${widget.classSessionId}');
+      debugPrint('GENERATE CODE => attendanceType: ${widget.attendanceType}');
+      debugPrint(
+        'GENERATE CODE body => ${jsonEncode({
+          if (widget.attendanceType == 'module')
+            'module_session_id': widget.classSessionId
+          else
+            'class_session_id': widget.classSessionId,
+          'attendance_type': widget.attendanceType,
+        })}',
+      );
       final response = await http
           .post(
             Uri.parse('http://10.0.2.2:8000/api/attendance/generate'),
@@ -171,6 +189,8 @@ class _AttendancePageState extends State<AttendancePage> {
       final Map<String, dynamic> data = response.body.isNotEmpty
           ? json.decode(response.body) as Map<String, dynamic>
           : {};
+      debugPrint('GENERATE CODE status => ${response.statusCode}');
+      debugPrint('GENERATE CODE body => ${response.body}');
 
       if (response.statusCode == 200) {
         setState(() {

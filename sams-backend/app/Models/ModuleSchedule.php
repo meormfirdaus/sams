@@ -6,6 +6,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class ModuleSchedule extends Model
 {
+    protected $table = 'module_schedules';
+
     protected $fillable = [
         'module_id',
         'class_date',
@@ -15,6 +17,9 @@ class ModuleSchedule extends Model
         'capacity',
         'booked_count',
         'status',
+        'session_type',
+        'week_number',
+        'lecturer_id',
     ];
 
     public function module()

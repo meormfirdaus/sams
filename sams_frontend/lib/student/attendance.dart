@@ -28,6 +28,7 @@ class StudentAttendancePage extends StatefulWidget {
 class _StudentAttendancePageState extends State<StudentAttendancePage> {
   bool isLoading = true;
   int? sessionStudentId;
+  int? savedUserId;
   final TextEditingController codeController = TextEditingController();
   bool isSubmitting = false;
   bool isGpsVerified = false;
@@ -51,6 +52,29 @@ class _StudentAttendancePageState extends State<StudentAttendancePage> {
 
   List<Map<String, String>> recentRecords = [];
 
+  String get _normalizedAttendanceType {
+    final type = widget.attendanceType.trim().toLowerCase();
+    return type == 'module' ? 'module' : 'course';
+  }
+
+  bool _hasMeaningfulAttendanceData(Map<String, dynamic> data) {
+    final studentNameValue = (data['student_name'] ?? '').toString().trim();
+    final currentTitleValue = (data['current_session_title'] ?? '').toString().trim();
+    final currentDateValue = (data['current_session_date'] ?? '').toString().trim();
+    final currentTimeValue = (data['current_session_time'] ?? '').toString().trim();
+    final activeCodeValue = (data['active_code'] ?? '').toString().trim();
+    final totalClassesValue = int.tryParse((data['total_classes'] ?? '0').toString()) ?? 0;
+    final recentRecordsValue = data['recent_records'] as List? ?? [];
+
+    return (studentNameValue.isNotEmpty && studentNameValue != '-') ||
+        (currentTitleValue.isNotEmpty && currentTitleValue != '-') ||
+        (currentDateValue.isNotEmpty && currentDateValue != '-') ||
+        (currentTimeValue.isNotEmpty && currentTimeValue != '-') ||
+        (activeCodeValue.isNotEmpty && activeCodeValue != '-') ||
+        totalClassesValue > 0 ||
+        recentRecordsValue.isNotEmpty;
+  }
+
   @override
   void dispose() {
     codeController.dispose();
@@ -66,13 +90,14 @@ class _StudentAttendancePageState extends State<StudentAttendancePage> {
   Future<void> loadSession() async {
     final prefs = await SharedPreferences.getInstance();
     final savedStudentId = prefs.getInt('student_id');
-    final savedUserId = prefs.getInt('user_id');
+    final savedUserIdFromPrefs = prefs.getInt('user_id');
 
-    sessionStudentId = savedStudentId ?? savedUserId;
+    savedUserId = savedUserIdFromPrefs;
+    sessionStudentId = savedStudentId ?? widget.studentId;
 
     debugPrint(
       'StudentAttendancePage loaded studentId: ${sessionStudentId ?? widget.studentId}, '
-      'subjectId: ${widget.subjectId}, attendanceType: ${widget.attendanceType}',
+      'subjectId: ${widget.subjectId}, attendanceType: $_normalizedAttendanceType',
     );
 
     fetchAttendanceData();
@@ -84,16 +109,59 @@ class _StudentAttendancePageState extends State<StudentAttendancePage> {
     });
 
     try {
-      final response = await http
-          .get(
-            Uri.parse(
-              'http://10.0.2.2:8000/api/student/${sessionStudentId ?? widget.studentId}/attendance/${widget.subjectId}?type=${widget.attendanceType}',
-            ),
-          )
-          .timeout(const Duration(seconds: 10));
+      final candidateIds = <int>[];
+      final primaryId = sessionStudentId ?? widget.studentId;
+      if (primaryId > 0) candidateIds.add(primaryId);
+      if (!candidateIds.contains(widget.studentId) && widget.studentId > 0) {
+        candidateIds.add(widget.studentId);
+      }
+      if (savedUserId != null && !candidateIds.contains(savedUserId) && savedUserId! > 0) {
+        candidateIds.add(savedUserId!);
+      }
 
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body) as Map<String, dynamic>;
+      http.Response? successfulResponse;
+      int? successfulStudentId;
+      http.Response? lastResponse;
+      Map<String, dynamic>? successfulData;
+
+      for (final candidateId in candidateIds) {
+        final response = await http
+            .get(
+              Uri.parse(
+                'http://10.0.2.2:8000/api/student/$candidateId/attendance/${widget.subjectId}?type=$_normalizedAttendanceType',
+              ),
+            )
+            .timeout(const Duration(seconds: 10));
+
+        debugPrint(
+          'Attendance fetch try => studentId: $candidateId, '
+          'subjectId: ${widget.subjectId}, type: $_normalizedAttendanceType, '
+          'status: ${response.statusCode}',
+        );
+        debugPrint('Attendance fetch body => ${response.body}');
+
+        lastResponse = response;
+
+        if (response.statusCode == 200) {
+          final decodedData = json.decode(response.body) as Map<String, dynamic>;
+          final hasMeaningfulData = _hasMeaningfulAttendanceData(decodedData);
+
+          debugPrint(
+            'Attendance fetch parsed => studentId: $candidateId, '
+            'meaningful: $hasMeaningfulData',
+          );
+
+          if (hasMeaningfulData) {
+            successfulResponse = response;
+            successfulStudentId = candidateId;
+            successfulData = decodedData;
+            break;
+          }
+        }
+      }
+
+      if (successfulResponse != null) {
+        final data = successfulData ?? json.decode(successfulResponse.body) as Map<String, dynamic>;
 
         final records = (data['recent_records'] as List? ?? [])
             .map<Map<String, String>>(
@@ -107,6 +175,7 @@ class _StudentAttendancePageState extends State<StudentAttendancePage> {
             .toList();
 
         setState(() {
+          sessionStudentId = successfulStudentId;
           studentName = data['student_name']?.toString() ?? '-';
           matricNumber = data['matric_number']?.toString() ?? '-';
           programme = data['programme']?.toString() ?? '-';
@@ -126,28 +195,37 @@ class _StudentAttendancePageState extends State<StudentAttendancePage> {
               data['current_session_time']?.toString() ?? '-';
           activeCode = data['active_code']?.toString() ?? '-';
 
-          if (widget.attendanceType == 'module') {
-            final cleanedTitle = currentSessionTitle
-                .replaceFirst('Lecture Session', 'Module Session')
-                .replaceFirst('lecture session', 'Module Session');
-
-            currentSessionTitle = cleanedTitle == '-' || cleanedTitle.trim().isEmpty
-                ? 'Module Session'
-                : cleanedTitle;
-          }
-
           recentRecords = records;
           isLoading = false;
         });
       } else {
-        debugPrint('Student attendance API failed: ${response.statusCode}');
-        debugPrint('Student attendance API body: ${response.body}');
+        debugPrint('Student attendance API failed for all candidate IDs or returned only placeholder data');
+        if (lastResponse != null) {
+          debugPrint('Last student attendance status: ${lastResponse.statusCode}');
+          debugPrint('Last student attendance body: ${lastResponse.body}');
+        }
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Unable to load attendance data${lastResponse != null ? ' (${lastResponse.statusCode})' : ''}.',
+              ),
+            ),
+          );
+        }
         setState(() {
           isLoading = false;
         });
       }
     } catch (e) {
       debugPrint('Error fetching student attendance data: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Connection error while loading attendance data: $e'),
+          ),
+        );
+      }
       setState(() {
         isLoading = false;
       });
@@ -227,18 +305,35 @@ class _StudentAttendancePageState extends State<StudentAttendancePage> {
 
       final response = await http.post(
         Uri.parse('http://10.0.2.2:8000/api/attendance/submit'),
-        headers: {'Content-Type': 'application/json'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
         body: jsonEncode({
           'student_id': studentId,
           'subject_id': widget.subjectId,
-          'attendance_type': widget.attendanceType,
+          'attendance_type': _normalizedAttendanceType,
           'code': enteredCode,
           'latitude': locationData.latitude,
           'longitude': locationData.longitude,
         }),
       );
 
-      final data = json.decode(response.body) as Map<String, dynamic>;
+      debugPrint('SUBMIT ATTENDANCE status => ${response.statusCode}');
+      debugPrint('SUBMIT ATTENDANCE body => ${response.body}');
+
+      Map<String, dynamic> data = {};
+      if (response.body.isNotEmpty) {
+        try {
+          data = json.decode(response.body) as Map<String, dynamic>;
+        } catch (_) {
+          data = {
+            'message': response.statusCode >= 500
+                ? 'Server error while submitting attendance.'
+                : 'Unexpected server response while submitting attendance.',
+          };
+        }
+      }
 
       if (response.statusCode == 200) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -256,10 +351,7 @@ class _StudentAttendancePageState extends State<StudentAttendancePage> {
         );
       }
     } catch (e) {
-      setState(() {
-        isGpsVerified = false;
-        gpsStatusText = 'GPS check failed';
-      });
+      debugPrint('SUBMIT ATTENDANCE error => $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Connection error: $e')),
       );
@@ -473,43 +565,32 @@ class _StudentAttendancePageState extends State<StudentAttendancePage> {
                             ),
                             child: Column(
                               children: [
-                                if (widget.attendanceType == 'module') ...[
-                                  Text(
-                                    currentSessionTitle,
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.black87,
-                                    ),
+                                Text(
+                                  currentSessionTitle,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.black87,
                                   ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    currentSessionTime,
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.black87,
-                                    ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  currentSessionDate,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.black87,
                                   ),
-                                ] else ...[
-                                  Text(
-                                    currentSessionTitle,
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.black87,
-                                    ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  currentSessionTime,
+                                  textAlign: TextAlign.center,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.black87,
                                   ),
-                                  const SizedBox(height: 6),
-                                  Text(
-                                    currentSessionTime,
-                                    textAlign: TextAlign.center,
-                                    style: const TextStyle(
-                                      fontSize: 14,
-                                      color: Colors.black87,
-                                    ),
-                                  ),
-                                ],
+                                ),
                                 const SizedBox(height: 14),
                                 Container(
                                   width: double.infinity,

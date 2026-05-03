@@ -25,12 +25,26 @@ class _BookNowPageState extends State<BookNowPage> {
   void initState() {
     super.initState();
     _searchController.addListener(_filterModules);
+<<<<<<< HEAD
     _initPage();
   }
 
   Future<void> _initPage() async {
     final prefs = await SharedPreferences.getInstance();
     _studentId = prefs.getInt('student_id');
+=======
+    _loadStudentIdAndFetchModules();
+  }
+
+  Future<void> _loadStudentIdAndFetchModules() async {
+    final prefs = await SharedPreferences.getInstance();
+    final savedStudentId = prefs.getInt('student_id');
+
+    setState(() {
+      _studentId = savedStudentId;
+    });
+
+>>>>>>> origin/main
     await fetchModules();
   }
 
@@ -224,7 +238,11 @@ class _BookNowPageState extends State<BookNowPage> {
                             ..._filteredModules.map(
                               (module) => ModuleCard(
                                 module: module,
+<<<<<<< HEAD
                                 onTap: () => _openAvailableClasses(module),
+=======
+                                studentId: _studentId,
+>>>>>>> origin/main
                               ),
                             ),
                           ],
@@ -239,12 +257,20 @@ class _BookNowPageState extends State<BookNowPage> {
 
 class ModuleCard extends StatelessWidget {
   final ModuleModel module;
+<<<<<<< HEAD
   final VoidCallback onTap;
+=======
+  final int? studentId;
+>>>>>>> origin/main
 
   const ModuleCard({
     super.key,
     required this.module,
+<<<<<<< HEAD
     required this.onTap,
+=======
+    required this.studentId,
+>>>>>>> origin/main
   });
 
   @override
@@ -291,19 +317,37 @@ class ModuleCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           InkWell(
+<<<<<<< HEAD
             onTap: module.booked ? null : onTap,
             borderRadius: BorderRadius.circular(20),
+=======
+            onTap: module.booked || studentId == null
+                ? null
+                : () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => AvailableClassesPage(
+                          module: module,
+                          studentId: studentId!,
+                        ),
+                      ),
+                    );
+                  },
+>>>>>>> origin/main
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 10),
               decoration: BoxDecoration(
-                color: module.booked ? Colors.red : primaryColor,
+                color: module.booked
+                    ? Colors.red
+                    : (studentId == null ? Colors.grey : primaryColor),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
                 module.booked
                     ? 'Booked class date: ${module.bookedClassDate ?? "-"}'
-                    : 'View Date Available',
+                    : (studentId == null ? 'Student session not found' : 'View Date Available'),
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   color: Colors.white,
