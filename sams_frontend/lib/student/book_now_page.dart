@@ -25,26 +25,12 @@ class _BookNowPageState extends State<BookNowPage> {
   void initState() {
     super.initState();
     _searchController.addListener(_filterModules);
-<<<<<<< HEAD
     _initPage();
   }
 
   Future<void> _initPage() async {
     final prefs = await SharedPreferences.getInstance();
     _studentId = prefs.getInt('student_id');
-=======
-    _loadStudentIdAndFetchModules();
-  }
-
-  Future<void> _loadStudentIdAndFetchModules() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedStudentId = prefs.getInt('student_id');
-
-    setState(() {
-      _studentId = savedStudentId;
-    });
-
->>>>>>> origin/main
     await fetchModules();
   }
 
@@ -128,7 +114,10 @@ class _BookNowPageState extends State<BookNowPage> {
     final result = await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => AvailableClassesPage(module: module),
+        builder: (context) => AvailableClassesPage(
+          module: module,
+          studentId: _studentId!,
+        ),
       ),
     );
 
@@ -156,13 +145,7 @@ class _BookNowPageState extends State<BookNowPage> {
             Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
-              decoration: const BoxDecoration(
-                color: primaryColor,
-                borderRadius: BorderRadius.only(
-                  // bottomLeft: Radius.circular(18),
-                  // bottomRight: Radius.circular(18),
-                ),
-              ),
+              color: primaryColor,
               child: Row(
                 children: [
                   GestureDetector(
@@ -189,37 +172,6 @@ class _BookNowPageState extends State<BookNowPage> {
                       : ListView(
                           padding: const EdgeInsets.all(16),
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF2E2A9),
-                                borderRadius: BorderRadius.circular(18),
-                              ),
-                              child: const Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '📌 Reminder',
-                                    style: TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  SizedBox(height: 6),
-                                  Text(
-                                    'Passed modules cannot be booked\n'
-                                    'Same core module: max 2 attempts\n'
-                                    'Only not taken / failed modules allowed\n'
-                                    'Maximum 2 modules per booking',
-                                    style: TextStyle(
-                                      fontSize: 15,
-                                      fontWeight: FontWeight.w600,
-                                      color: Colors.black54,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
                             const SizedBox(height: 16),
                             TextField(
                               controller: _searchController,
@@ -238,11 +190,8 @@ class _BookNowPageState extends State<BookNowPage> {
                             ..._filteredModules.map(
                               (module) => ModuleCard(
                                 module: module,
-<<<<<<< HEAD
-                                onTap: () => _openAvailableClasses(module),
-=======
                                 studentId: _studentId,
->>>>>>> origin/main
+                                onTap: () => _openAvailableClasses(module),
                               ),
                             ),
                           ],
@@ -257,20 +206,14 @@ class _BookNowPageState extends State<BookNowPage> {
 
 class ModuleCard extends StatelessWidget {
   final ModuleModel module;
-<<<<<<< HEAD
   final VoidCallback onTap;
-=======
   final int? studentId;
->>>>>>> origin/main
 
   const ModuleCard({
     super.key,
     required this.module,
-<<<<<<< HEAD
     required this.onTap,
-=======
     required this.studentId,
->>>>>>> origin/main
   });
 
   @override
@@ -289,10 +232,7 @@ class ModuleCard extends StatelessWidget {
           Text(
             '${module.code} ${module.name}'.toUpperCase(),
             textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w500,
-            ),
+            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
           ),
           const SizedBox(height: 12),
           Align(
@@ -300,41 +240,16 @@ class ModuleCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  '📍 ${module.location}',
-                  style: const TextStyle(fontSize: 12, color: Colors.black54),
-                ),
-                Text(
-                  '👤 ${module.lecturer}',
-                  style: const TextStyle(fontSize: 12, color: Colors.black54),
-                ),
-                Text(
-                  '⚙ ${module.category}',
-                  style: const TextStyle(fontSize: 12, color: Colors.black54),
-                ),
+                Text('📍 ${module.location}', style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                Text('👤 ${module.lecturer}', style: const TextStyle(fontSize: 12, color: Colors.black54)),
+                Text('⚙ ${module.category}', style: const TextStyle(fontSize: 12, color: Colors.black54)),
               ],
             ),
           ),
           const SizedBox(height: 14),
           InkWell(
-<<<<<<< HEAD
-            onTap: module.booked ? null : onTap,
+            onTap: module.booked || studentId == null ? null : onTap,
             borderRadius: BorderRadius.circular(20),
-=======
-            onTap: module.booked || studentId == null
-                ? null
-                : () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => AvailableClassesPage(
-                          module: module,
-                          studentId: studentId!,
-                        ),
-                      ),
-                    );
-                  },
->>>>>>> origin/main
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 10),
@@ -349,11 +264,7 @@ class ModuleCard extends StatelessWidget {
                     ? 'Booked class date: ${module.bookedClassDate ?? "-"}'
                     : (studentId == null ? 'Student session not found' : 'View Date Available'),
                 textAlign: TextAlign.center,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
-                ),
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12),
               ),
             ),
           ),

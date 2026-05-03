@@ -20,23 +20,22 @@ class _AvailableClassesPageState extends State<AvailableClassesPage> {
   bool _isLoading = true;
   String _errorMessage = '';
   List<dynamic> _schedules = [];
-<<<<<<< HEAD
+
   int? _studentId;
-=======
+
   int? _resolvedStudentId;
->>>>>>> origin/main
+
 
   @override
   void initState() {
     super.initState();
-<<<<<<< HEAD
+
     _initPage();
   }
 
   Future<void> _initPage() async {
     final prefs = await SharedPreferences.getInstance();
     _studentId = prefs.getInt('student_id');
-=======
     _loadStudentIdAndFetchSchedules();
   }
 
@@ -48,7 +47,7 @@ class _AvailableClassesPageState extends State<AvailableClassesPage> {
       _resolvedStudentId = savedStudentId ?? widget.studentId;
     });
 
->>>>>>> origin/main
+
     await fetchSchedules();
   }
 
@@ -96,11 +95,7 @@ class _AvailableClassesPageState extends State<AvailableClassesPage> {
           'Accept': 'application/json',
         },
         body: jsonEncode({
-<<<<<<< HEAD
-          'student_id': _studentId,
-=======
           'student_id': studentId,
->>>>>>> origin/main
           'module_id': widget.module.id,
           'module_schedule_id': scheduleId,
         }),
@@ -291,13 +286,13 @@ class _AvailableClassesPageState extends State<AvailableClassesPage> {
                                       width: double.infinity,
                                       padding: const EdgeInsets.symmetric(vertical: 10),
                                       decoration: BoxDecoration(
-<<<<<<< HEAD
+
                                         color: isFull ? Colors.grey : primaryColor,
-=======
+
                                         color: isFull
                                             ? Colors.grey
                                             : (studentMissing ? Colors.grey : primaryColor),
->>>>>>> origin/main
+
                                         borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Text(
