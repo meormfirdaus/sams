@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'homepage.dart';
-import 'class.dart';
+import '../attendance/lecturer/class.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});

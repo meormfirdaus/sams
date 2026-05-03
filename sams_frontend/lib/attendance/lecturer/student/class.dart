@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:sams_frontend/student/attendance.dart';
-import 'package:sams_frontend/student/view_course.dart';
+import 'package:sams_frontend/attendance/lecturer/student/attendance.dart';
+import 'package:sams_frontend/attendance/lecturer/student/view_course.dart';
 
 class StudentClassPage extends StatefulWidget {
   const StudentClassPage({super.key});
