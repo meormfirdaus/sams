@@ -1,17 +1,15 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'module_model.dart';
-
 
 class AvailableClassesPage extends StatefulWidget {
   final ModuleModel module;
-  final int studentId;
 
   const AvailableClassesPage({
     super.key,
     required this.module,
-    required this.studentId,
   });
 
   @override
@@ -22,11 +20,18 @@ class _AvailableClassesPageState extends State<AvailableClassesPage> {
   bool _isLoading = true;
   String _errorMessage = '';
   List<dynamic> _schedules = [];
+  int? _studentId;
 
   @override
   void initState() {
     super.initState();
-    fetchSchedules();
+    _initPage();
+  }
+
+  Future<void> _initPage() async {
+    final prefs = await SharedPreferences.getInstance();
+    _studentId = prefs.getInt('student_id');
+    await fetchSchedules();
   }
 
   Future<void> fetchSchedules() async {
@@ -58,6 +63,13 @@ class _AvailableClassesPageState extends State<AvailableClassesPage> {
 
   Future<void> bookSchedule(int scheduleId) async {
     try {
+      if (_studentId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Student ID not found. Please login again.')),
+        );
+        return;
+      }
+
       final response = await http.post(
         Uri.parse('http://10.0.2.2:8000/api/modules/book'),
         headers: {
@@ -65,7 +77,7 @@ class _AvailableClassesPageState extends State<AvailableClassesPage> {
           'Accept': 'application/json',
         },
         body: jsonEncode({
-          'student_id': widget.studentId,
+          'student_id': _studentId,
           'module_id': widget.module.id,
           'module_schedule_id': scheduleId,
         }),
@@ -75,17 +87,9 @@ class _AvailableClassesPageState extends State<AvailableClassesPage> {
 
       if (response.statusCode == 200 && decoded['status'] == true) {
         if (!mounted) return;
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Module booking successful.'),
-          ),
-        );
-
-        fetchSchedules();
+        Navigator.pop(context, true);
       } else {
         if (!mounted) return;
-
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(decoded['message'] ?? 'Booking failed'),
@@ -94,7 +98,6 @@ class _AvailableClassesPageState extends State<AvailableClassesPage> {
       }
     } catch (e) {
       if (!mounted) return;
-
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error: $e'),
@@ -161,8 +164,8 @@ class _AvailableClassesPageState extends State<AvailableClassesPage> {
               decoration: const BoxDecoration(
                 color: primaryColor,
                 borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(18),
-                  bottomRight: Radius.circular(18),
+                  // bottomLeft: Radius.circular(18),
+                  // bottomRight: Radius.circular(18),
                 ),
               ),
               child: Row(
@@ -264,7 +267,7 @@ class _AvailableClassesPageState extends State<AvailableClassesPage> {
                                       width: double.infinity,
                                       padding: const EdgeInsets.symmetric(vertical: 10),
                                       decoration: BoxDecoration(
-                                        color: primaryColor,
+                                        color: isFull ? Colors.grey : primaryColor,
                                         borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Text(

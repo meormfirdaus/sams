@@ -27,7 +27,7 @@ class ModuleModel {
       location: json['location'] ?? '',
       lecturer: json['lecturer'] ?? '',
       category: json['category'] ?? '',
-      booked: json['is_booked'] ?? false,
+      booked: json['booked'] ?? false,
       bookedClassDate: json['booked_class_date'],
     );
   }

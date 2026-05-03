@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import 'module_model.dart';
 import 'available_classes_page.dart';
 
@@ -18,36 +19,59 @@ class _BookNowPageState extends State<BookNowPage> {
   List<ModuleModel> _filteredModules = [];
   bool _isLoading = true;
   String _errorMessage = '';
+  int? _studentId;
 
   @override
   void initState() {
     super.initState();
-    fetchModules();
     _searchController.addListener(_filterModules);
+    _initPage();
+  }
+
+  Future<void> _initPage() async {
+    final prefs = await SharedPreferences.getInstance();
+    _studentId = prefs.getInt('student_id');
+    await fetchModules();
   }
 
   @override
   void dispose() {
+    _searchController.removeListener(_filterModules);
     _searchController.dispose();
     super.dispose();
   }
 
   Future<void> fetchModules() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = '';
+    });
+
     try {
+      if (_studentId == null) {
+        setState(() {
+          _errorMessage = 'Student ID not found. Please login again.';
+          _isLoading = false;
+        });
+        return;
+      }
+
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:8000/api/modules'),
+        Uri.parse('http://10.0.2.2:8000/api/modules?student_id=$_studentId'),
       );
 
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
-        final List data = decoded['data'];
+        final List data = decoded['data'] ?? [];
 
-        final modules =
-            data.map((e) => ModuleModel.fromJson(e)).toList().cast<ModuleModel>();
+        final modules = data
+            .map((e) => ModuleModel.fromJson(e))
+            .toList()
+            .cast<ModuleModel>();
 
         setState(() {
           _allModules = modules;
-          _filteredModules = modules;
+          _filteredModules = _applySearch(_searchController.text, modules);
           _isLoading = false;
         });
       } else {
@@ -64,18 +88,46 @@ class _BookNowPageState extends State<BookNowPage> {
     }
   }
 
-  void _filterModules() {
-    final query = _searchController.text.toLowerCase();
+  List<ModuleModel> _applySearch(String query, List<ModuleModel> modules) {
+    final q = query.toLowerCase().trim();
 
+    if (q.isEmpty) return modules;
+
+    return modules.where((module) {
+      return module.code.toLowerCase().contains(q) ||
+          module.name.toLowerCase().contains(q) ||
+          module.location.toLowerCase().contains(q) ||
+          module.lecturer.toLowerCase().contains(q) ||
+          module.category.toLowerCase().contains(q);
+    }).toList();
+  }
+
+  void _filterModules() {
     setState(() {
-      _filteredModules = _allModules.where((module) {
-        return module.code.toLowerCase().contains(query) ||
-            module.name.toLowerCase().contains(query) ||
-            module.location.toLowerCase().contains(query) ||
-            module.lecturer.toLowerCase().contains(query) ||
-            module.category.toLowerCase().contains(query);
-      }).toList();
+      _filteredModules = _applySearch(_searchController.text, _allModules);
     });
+  }
+
+  Future<void> _openAvailableClasses(ModuleModel module) async {
+    if (module.booked) return;
+
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => AvailableClassesPage(module: module),
+      ),
+    );
+
+    if (result == true) {
+      await fetchModules();
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Successfully booked class'),
+        ),
+      );
+    }
   }
 
   @override
@@ -93,8 +145,8 @@ class _BookNowPageState extends State<BookNowPage> {
               decoration: const BoxDecoration(
                 color: primaryColor,
                 borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(18),
-                  bottomRight: Radius.circular(18),
+                  // bottomLeft: Radius.circular(18),
+                  // bottomRight: Radius.circular(18),
                 ),
               ),
               child: Row(
@@ -170,7 +222,10 @@ class _BookNowPageState extends State<BookNowPage> {
                             ),
                             const SizedBox(height: 16),
                             ..._filteredModules.map(
-                              (module) => ModuleCard(module: module),
+                              (module) => ModuleCard(
+                                module: module,
+                                onTap: () => _openAvailableClasses(module),
+                              ),
                             ),
                           ],
                         ),
@@ -184,8 +239,13 @@ class _BookNowPageState extends State<BookNowPage> {
 
 class ModuleCard extends StatelessWidget {
   final ModuleModel module;
+  final VoidCallback onTap;
 
-  const ModuleCard({super.key, required this.module});
+  const ModuleCard({
+    super.key,
+    required this.module,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -231,19 +291,8 @@ class ModuleCard extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           InkWell(
-            onTap: module.booked
-                ? null
-                : () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => AvailableClassesPage(
-                          module: module,
-                          studentId: 2,
-                        ),
-                      ),
-                    );
-                  },
+            onTap: module.booked ? null : onTap,
+            borderRadius: BorderRadius.circular(20),
             child: Container(
               width: double.infinity,
               padding: const EdgeInsets.symmetric(vertical: 10),

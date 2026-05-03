@@ -29,3 +29,7 @@ Route::delete('/attendance/records/{attendanceId}', [AttendanceController::class
 Route::get('/modules', [ModuleController::class, 'index']);
 Route::get('/modules/{id}/schedules', [ModuleController::class, 'schedules']);
 Route::post('/modules/book', [ModuleController::class, 'book']);
+Route::get('/modules/my-bookings', [ModuleController::class, 'myBookings']);
+Route::delete('/modules/bookings/{registrationId}/cancel', [ModuleController::class, 'cancelBooking']);
+Route::get('/modules/credit-claims', [ModuleController::class, 'creditClaims']);
+Route::post('/modules/credit-claims/apply', [ModuleController::class, 'applyCreditClaim']);
