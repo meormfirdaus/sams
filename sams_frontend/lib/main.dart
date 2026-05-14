@@ -5,6 +5,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sams_frontend/lecturer/mainNavigation.dart' as lecturer_nav;
 import 'package:sams_frontend/student/mainNavigation.dart' as student_nav;
 import 'package:sams_frontend/treasurer/dashboard_page.dart' as treasurer_page;
+import 'package:sams_frontend/faculty_registrar/mainNavigation.dart' as faculty_reg_nav;
+import 'package:sams_frontend/pusat_adab/mainNavigation.dart' as pusat_adab_nav;
 
 void main() {
   runApp(const SAMSApp());
@@ -20,6 +22,7 @@ class SAMSApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primarySwatch: Colors.blue,
+        fontFamily: 'Nunito',
       ),
       home: const LoginPage(),
     );
@@ -39,6 +42,8 @@ class _LoginPageState extends State<LoginPage> {
 
   String? selectedRole;
   bool isLoading = false;
+  bool rememberMe = false;
+  bool obscurePassword = true;
 
   final List<String> roles = [
     'Student',
@@ -145,37 +150,52 @@ class _LoginPageState extends State<LoginPage> {
         final resolvedRole = (data['role'] ?? apiRole).toString().trim();
         final normalizedRole = resolvedRole.toLowerCase();
 
-        if (normalizedRole == 'lecturer') {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const lecturer_nav.MainNavigation(),
-            ),
-          );
-        } else if (normalizedRole == 'student') {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const student_nav.MainNavigation(),
-            ),
-          );
-        } else if (normalizedRole == 'treasury' || normalizedRole == 'treasurer') {
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const treasurer_page.DashboardPage(),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(data['message']?.toString() ?? 'Login successful')),
-          );
-        }
+              if (normalizedRole == 'lecturer') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const lecturer_nav.MainNavigation(),
+          ),
+        );
+      } else if (normalizedRole == 'student') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const student_nav.MainNavigation(),
+          ),
+        );
+      } else if (normalizedRole == 'treasury' || normalizedRole == 'treasurer') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const treasurer_page.DashboardPage(),
+          ),
+        );
+      } else if (normalizedRole == 'faculty_registrar') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const faculty_reg_nav.MainNavigation(),
+          ),
+        );
+      } else if (normalizedRole == 'pusat_adab') {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const pusat_adab_nav.MainNavigation(),
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(data['message']?.toString() ?? 'Login successful')),
+        );
+      }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              data['message']?.toString() ?? 'Login failed. Please check your credentials.',
+              data['message']?.toString() ??
+                  'Login failed. Please check your credentials.',
             ),
           ),
         );
@@ -197,75 +217,279 @@ class _LoginPageState extends State<LoginPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("SAMS Login"),
-        centerTitle: true,
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Color(0xFF6B5BE6),
+              Color(0xFF9B8FF5),
+              Color(0xFFB8A0FF),
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Center(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 24),
+              child: Container(
+                width: double.infinity,
+                constraints: const BoxConstraints(maxWidth: 400),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEEEAFA),
+                  borderRadius: BorderRadius.circular(28),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.18),
+                      blurRadius: 32,
+                      offset: const Offset(0, 12),
+                    ),
+                  ],
+                ),
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 36),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Logo
+                    Image.asset(
+                      'assets/images/logoumpsa.png',
+                      height: 160,
+                      fit: BoxFit.contain,
+                      errorBuilder: (context, error, stackTrace) => Container(
+                        height: 110,
+                        width: 110,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFF1A8C7E),
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Icon(Icons.school, size: 60, color: Colors.white),
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Student Academic Management System',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF2D2D2D),
+                      ),
+                    ),
+                    const SizedBox(height: 28),
+
+                    // ID Number field
+                    _buildInputField(
+                      controller: idController,
+                      hintText: 'ID Number',
+                      icon: Icons.person_outline,
+                      textCapitalization: TextCapitalization.characters,
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Password field
+                    _buildPasswordField(),
+                    const SizedBox(height: 14),
+
+                    // Category dropdown
+                    _buildDropdown(),
+                    const SizedBox(height: 14),
+
+                    // Remember Me + Forgot Password
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Row(
+                          children: [
+                            SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: Checkbox(
+                                tristate: false, // ✅ FIXED
+                                value: rememberMe,
+                                onChanged: (bool? val) {
+                                  setState(() {
+                                    rememberMe = val == true; // ✅ FIXED
+                                  });
+                                },
+                                activeColor: const Color(0xFF6B5BE6),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(3),
+                                ),
+                                side: const BorderSide(color: Color(0xFF9B8FF5)),
+                              ),
+                            ),
+                            const SizedBox(width: 6),
+                            const Text(
+                              'Remember Me',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Color(0xFF555555),
+                              ),
+                            ),
+                          ],
+                        ),
+                        GestureDetector(
+                          onTap: () {},
+                          child: const Text(
+                            'Forgot Password?',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF6B5BE6),
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+
+                    // Login Button
+                    SizedBox(
+                      width: double.infinity,
+                      height: 50,
+                      child: ElevatedButton(
+                        onPressed: isLoading ? null : login,
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF6B5BE6),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          elevation: 4,
+                          shadowColor: const Color(0xFF6B5BE6).withOpacity(0.5),
+                        ),
+                        child: isLoading
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2.5,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'LOGIN',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 2.5,
+                                ),
+                              ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text(
-              "SA Management System",
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
+    );
+  }
+
+  Widget _buildInputField({
+    required TextEditingController controller,
+    required String hintText,
+    required IconData icon,
+    TextCapitalization textCapitalization = TextCapitalization.none,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFDDD8F5),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: TextField(
+        controller: controller,
+        textCapitalization: textCapitalization,
+        style: const TextStyle(fontSize: 14, color: Color(0xFF2D2D2D)),
+        decoration: InputDecoration(
+          hintText: hintText,
+          hintStyle: const TextStyle(color: Color(0xFF9E9E9E), fontSize: 14),
+          prefixIcon: Icon(icon, color: const Color(0xFF9E9E9E), size: 20),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 16),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPasswordField() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFDDD8F5),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: TextField(
+        controller: passwordController,
+        obscureText: obscurePassword,
+        style: const TextStyle(fontSize: 14, color: Color(0xFF2D2D2D)),
+        decoration: InputDecoration(
+          hintText: 'Password',
+          hintStyle: const TextStyle(color: Color(0xFF9E9E9E), fontSize: 14),
+          prefixIcon: const Icon(Icons.lock_outline,
+              color: Color(0xFF9E9E9E), size: 20),
+          suffixIcon: GestureDetector(
+            onTap: () {
+              setState(() {
+                obscurePassword = !obscurePassword;
+              });
+            },
+            child: Icon(
+              obscurePassword
+                  ? Icons.visibility_off_outlined
+                  : Icons.visibility_outlined,
+              color: const Color(0xFF9E9E9E),
+              size: 20,
             ),
-            const SizedBox(height: 40),
-            TextField(
-              controller: idController,
-              textCapitalization: TextCapitalization.characters,
-              decoration: const InputDecoration(
-                labelText: "Matric ID / Staff ID",
-                hintText: "Example: CB23017 / STF001",
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 20),
-            DropdownButtonFormField<String>(
-              value: selectedRole,
-              decoration: const InputDecoration(
-                labelText: "Select Role",
-                border: OutlineInputBorder(),
-              ),
-              items: roles.map((role) {
-                return DropdownMenuItem(
-                  value: role,
-                  child: Text(role),
-                );
-              }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  selectedRole = value;
-                });
-              },
-            ),
-            const SizedBox(height: 20),
-            TextField(
-              controller: passwordController,
-              obscureText: true,
-              decoration: const InputDecoration(
-                labelText: "Password",
-                border: OutlineInputBorder(),
-              ),
-            ),
-            const SizedBox(height: 30),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: isLoading ? null : login,
-                child: isLoading
-                    ? const SizedBox(
-                        width: 20,
-                        height: 20,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Text("Login"),
-              ),
-            ),
-          ],
+          ),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(vertical: 16),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDropdown() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFDDD8F5),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 4),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButtonFormField<String>(
+          value: selectedRole,
+          decoration: const InputDecoration(
+            prefixIcon: Icon(Icons.language,
+                color: Color(0xFF9E9E9E), size: 20),
+            border: InputBorder.none,
+            contentPadding: EdgeInsets.symmetric(vertical: 4),
+          ),
+          hint: const Text(
+            'Category',
+            style: TextStyle(color: Color(0xFF9E9E9E), fontSize: 14),
+          ),
+          icon: const Icon(Icons.keyboard_arrow_down_rounded,
+              color: Color(0xFF9E9E9E)),
+          dropdownColor: const Color(0xFFEEEAFA),
+          style: const TextStyle(fontSize: 14, color: Color(0xFF2D2D2D)),
+          items: roles.map((role) {
+            return DropdownMenuItem(
+              value: role,
+              child: Text(role),
+            );
+          }).toList(),
+          onChanged: (value) {
+            setState(() {
+              selectedRole = value;
+            });
+          },
         ),
       ),
     );

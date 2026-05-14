@@ -9,6 +9,9 @@ class Subject extends Model
     protected $fillable = [
         'code',
         'name',
-        'credit_hour'
+        'credit_hour',
+        'examination',
+        'exam_date',
+        'exam_period',
     ];
 }
