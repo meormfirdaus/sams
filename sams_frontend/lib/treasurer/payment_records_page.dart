@@ -3,24 +3,21 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-import 'payment_records_page.dart';
-import 'verify_student_payment_page.dart';
-
-class DashboardPage extends StatefulWidget {
-  const DashboardPage({super.key});
+class PaymentRecordsPage extends StatefulWidget {
+  const PaymentRecordsPage({super.key});
 
   @override
-  State<DashboardPage> createState() => _DashboardPageState();
+  State<PaymentRecordsPage> createState() => _PaymentRecordsPageState();
 }
 
-class _DashboardPageState extends State<DashboardPage> {
+class _PaymentRecordsPageState extends State<PaymentRecordsPage> {
   final TextEditingController _searchController = TextEditingController();
 
   bool isLoading = true;
-  String selectedStatus = 'Pending';
-  String selectedCourse = 'All';
+  String selectedStatus = 'All';
 
-  int pendingCount = 0;
+  int totalRecords = 0;
+  double totalCollected = 0;
   int approvedCount = 0;
   int rejectedCount = 0;
 
@@ -28,29 +25,23 @@ class _DashboardPageState extends State<DashboardPage> {
   int currentPage = 1;
   int lastPage = 1;
 
-  final List<String> courses = [
-    'All',
-    'Software Engineering',
-  ];
-
   @override
   void initState() {
     super.initState();
-    fetchDashboardData();
+    fetchRecords();
   }
 
-  Future<void> fetchDashboardData({int page = 1}) async {
+  Future<void> fetchRecords({int page = 1}) async {
     setState(() {
       isLoading = true;
     });
 
     try {
       final uri = Uri.parse(
-        //'http://127.0.0.1:8000/api/tuition/treasurer/pending'
-        'http://10.0.2.2:8000/api/tuition/treasurer/pending'
+        //'http://127.0.0.1:8000/api/tuition/treasurer/records'
+        'http://10.0.2.2:8000/api/tuition/treasurer/records'
         '?status=$selectedStatus'
         '&search=${Uri.encodeComponent(_searchController.text.trim())}'
-        '&course=${Uri.encodeComponent(selectedCourse)}'
         '&page=$page',
       );
 
@@ -63,17 +54,39 @@ class _DashboardPageState extends State<DashboardPage> {
 
       if (response.statusCode == 200) {
         setState(() {
-          pendingCount = data['summary']['pending_count'] ?? 0;
-          approvedCount = data['summary']['approved_count'] ?? 0;
-          rejectedCount = data['summary']['rejected_count'] ?? 0;
+          totalRecords = int.tryParse(
+                (data['summary']['total_records'] ?? '0').toString(),
+              ) ??
+              0;
+
+          totalCollected = double.tryParse(
+                (data['summary']['total_collected'] ?? '0').toString(),
+              ) ??
+              0.0;
+
+          approvedCount = int.tryParse(
+                (data['summary']['approved_count'] ?? '0').toString(),
+              ) ??
+              0;
+
+          rejectedCount = int.tryParse(
+                (data['summary']['rejected_count'] ?? '0').toString(),
+              ) ??
+              0;
 
           records = data['records']['data'] ?? [];
-          currentPage = data['records']['current_page'] ?? 1;
-          lastPage = data['records']['last_page'] ?? 1;
+          currentPage = int.tryParse(
+                (data['records']['current_page'] ?? '1').toString(),
+              ) ??
+              1;
+          lastPage = int.tryParse(
+                (data['records']['last_page'] ?? '1').toString(),
+              ) ??
+              1;
         });
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data['message']?.toString() ?? 'Failed to load data')),
+          SnackBar(content: Text(data['message']?.toString() ?? 'Failed to load records')),
         );
       }
     } catch (e) {
@@ -125,7 +138,7 @@ class _DashboardPageState extends State<DashboardPage> {
             Text(
               value,
               style: TextStyle(
-                fontSize: 22,
+                fontSize: 20,
                 fontWeight: FontWeight.w700,
                 color: color,
               ),
@@ -152,7 +165,7 @@ class _DashboardPageState extends State<DashboardPage> {
           setState(() {
             selectedStatus = value;
           });
-          fetchDashboardData();
+          fetchRecords();
         },
         child: Column(
           children: [
@@ -187,38 +200,23 @@ class _DashboardPageState extends State<DashboardPage> {
           children: [
             Container(
               width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
               decoration: const BoxDecoration(
                 color: primaryColor,
-                ),
+                      ),
               child: Row(
                 children: [
-                  const Expanded(
-                    child: Text(
-                      'Tuition Fee Management',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 21,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
                   ),
-                  TextButton(
-                    onPressed: () async {
-                      await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const PaymentRecordsPage(),
-                        ),
-                      );
-                      fetchDashboardData();
-                    },
-                    child: const Text(
-                      'Records',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                      ),
+                  const SizedBox(width: 4),
+                  const Text(
+                    'Payment Records',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
@@ -231,37 +229,10 @@ class _DashboardPageState extends State<DashboardPage> {
                       padding: const EdgeInsets.all(14),
                       child: Column(
                         children: [
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFD6F3F7),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: const Text(
-                                'Semester 2, 2025/2026',
-                                style: TextStyle(
-                                  color: primaryColor,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              _summaryCard('$pendingCount', 'Pending', const Color(0xFFF4B400)),
-                              _summaryCard('$approvedCount', 'Approved', const Color(0xFF2EAD67)),
-                              _summaryCard('$rejectedCount', 'Rejected', const Color(0xFFE85B5B)),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
                           TextField(
                             controller: _searchController,
                             decoration: InputDecoration(
-                              hintText: 'Search Matric No.',
+                              hintText: 'Search by Matric No. or Date',
                               prefixIcon: const Icon(Icons.search, size: 18),
                               filled: true,
                               fillColor: Colors.white,
@@ -275,59 +246,23 @@ class _DashboardPageState extends State<DashboardPage> {
                                 borderSide: const BorderSide(color: Color(0xFFE2E2E2)),
                               ),
                             ),
-                            onSubmitted: (_) => fetchDashboardData(),
+                            onSubmitted: (_) => fetchRecords(),
                           ),
-                          const SizedBox(height: 10),
+                          const SizedBox(height: 12),
                           Row(
                             children: [
-                              Expanded(
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white,
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: Border.all(color: const Color(0xFFE2E2E2)),
-                                  ),
-                                  child: DropdownButtonHideUnderline(
-                                    child: DropdownButton<String>(
-                                      value: selectedCourse,
-                                      isExpanded: true,
-                                      items: courses.map((course) {
-                                        return DropdownMenuItem(
-                                          value: course,
-                                          child: Text(course, style: const TextStyle(fontSize: 12)),
-                                        );
-                                      }).toList(),
-                                      onChanged: (value) {
-                                        setState(() {
-                                          selectedCourse = value!;
-                                        });
-                                        fetchDashboardData();
-                                      },
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              ElevatedButton(
-                                onPressed: fetchDashboardData,
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.white,
-                                  foregroundColor: const Color(0xFF7F7F7F),
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                    side: const BorderSide(color: Color(0xFFE2E2E2)),
-                                  ),
-                                ),
-                                child: const Text('Refresh'),
+                              _summaryCard('$totalRecords', 'Total Records', primaryColor),
+                              _summaryCard(
+                                'RM ${totalCollected.toStringAsFixed(0)}',
+                                'Total Collected',
+                                const Color(0xFF2EAD67),
                               ),
                             ],
                           ),
                           const SizedBox(height: 12),
                           Row(
                             children: [
-                              _tabItem('Pending', 'Pending', const Color(0xFFF4B400)),
+                              _tabItem('All', 'All', primaryColor),
                               _tabItem('Approved', 'Approved', const Color(0xFF2EAD67)),
                               _tabItem('Rejected', 'Rejected', const Color(0xFFE85B5B)),
                             ],
@@ -347,7 +282,14 @@ class _DashboardPageState extends State<DashboardPage> {
                                   child: const Row(
                                     children: [
                                       Expanded(
-                                        flex: 3,
+                                        flex: 2,
+                                        child: Text(
+                                          'DATE',
+                                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF8A8A8A)),
+                                        ),
+                                      ),
+                                      Expanded(
+                                        flex: 2,
                                         child: Text(
                                           'MATRIC NO.',
                                           style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF8A8A8A)),
@@ -364,14 +306,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                         flex: 2,
                                         child: Text(
                                           'STATUS',
-                                          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF8A8A8A)),
-                                        ),
-                                      ),
-                                      Expanded(
-                                        flex: 2,
-                                        child: Text(
-                                          'ACTION',
-                                          textAlign: TextAlign.center,
+                                          textAlign: TextAlign.right,
                                           style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Color(0xFF8A8A8A)),
                                         ),
                                       ),
@@ -397,20 +332,19 @@ class _DashboardPageState extends State<DashboardPage> {
                                       child: Row(
                                         children: [
                                           Expanded(
-                                            flex: 3,
-                                            child: Column(
-                                              crossAxisAlignment: CrossAxisAlignment.start,
-                                              children: [
-                                                Text(
-                                                  item['matric_no']?.toString() ?? '-',
-                                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
-                                                ),
-                                                const SizedBox(height: 2),
-                                                Text(
-                                                  item['name']?.toString() ?? '-',
-                                                  style: const TextStyle(fontSize: 10, color: Color(0xFF888888)),
-                                                ),
-                                              ],
+                                            flex: 2,
+                                            child: Text(
+                                              item['submitted_at'] != null
+                                                  ? item['submitted_at'].toString().substring(0, 10)
+                                                  : '-',
+                                              style: const TextStyle(fontSize: 12),
+                                            ),
+                                          ),
+                                          Expanded(
+                                            flex: 2,
+                                            child: Text(
+                                              item['matric_no']?.toString() ?? '-',
+                                              style: const TextStyle(fontSize: 12),
                                             ),
                                           ),
                                           Expanded(
@@ -422,49 +356,21 @@ class _DashboardPageState extends State<DashboardPage> {
                                           ),
                                           Expanded(
                                             flex: 2,
-                                            child: Container(
-                                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                                              decoration: BoxDecoration(
-                                                color: statusBg(status),
-                                                borderRadius: BorderRadius.circular(14),
-                                              ),
-                                              child: Text(
-                                                status.toUpperCase(),
-                                                textAlign: TextAlign.center,
-                                                style: TextStyle(
-                                                  fontSize: 10,
-                                                  fontWeight: FontWeight.w700,
-                                                  color: statusText(status),
+                                            child: Align(
+                                              alignment: Alignment.centerRight,
+                                              child: Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                                                decoration: BoxDecoration(
+                                                  color: statusBg(status),
+                                                  borderRadius: BorderRadius.circular(14),
                                                 ),
-                                              ),
-                                            ),
-                                          ),
-                                          Expanded(
-                                            flex: 2,
-                                            child: Center(
-                                              child: ElevatedButton(
-                                                onPressed: () async {
-                                                  await Navigator.push(
-                                                    context,
-                                                    MaterialPageRoute(
-                                                      builder: (_) => VerifyStudentPaymentPage(
-                                                        paymentId: item['id'],
-                                                      ),
-                                                    ),
-                                                  );
-                                                  fetchDashboardData(page: currentPage);
-                                                },
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: primaryColor,
-                                                  minimumSize: const Size(58, 32),
-                                                  padding: EdgeInsets.zero,
-                                                  shape: RoundedRectangleBorder(
-                                                    borderRadius: BorderRadius.circular(14),
+                                                child: Text(
+                                                  status.toUpperCase(),
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: statusText(status),
                                                   ),
-                                                ),
-                                                child: const Text(
-                                                  'View',
-                                                  style: TextStyle(fontSize: 11, color: Colors.white),
                                                 ),
                                               ),
                                             ),
@@ -488,7 +394,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                 children: [
                                   ElevatedButton(
                                     onPressed: currentPage > 1
-                                        ? () => fetchDashboardData(page: currentPage - 1)
+                                        ? () => fetchRecords(page: currentPage - 1)
                                         : null,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: const Color(0xFFE0E0E0),
@@ -503,7 +409,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                   const SizedBox(width: 8),
                                   ElevatedButton(
                                     onPressed: currentPage < lastPage
-                                        ? () => fetchDashboardData(page: currentPage + 1)
+                                        ? () => fetchRecords(page: currentPage + 1)
                                         : null,
                                     style: ElevatedButton.styleFrom(
                                       backgroundColor: primaryColor,

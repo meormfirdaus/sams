@@ -67,6 +67,7 @@ class _StudentClassPageState extends State<StudentClassPage> {
     try {
       final response = await http
           .get(
+            //Uri.parse('http://127.0.0.1:8000/api/student/$studentId/subjects'),
             Uri.parse('http://10.0.2.2:8000/api/student/$studentId/subjects'),
           )
           .timeout(const Duration(seconds: 10));
@@ -76,6 +77,7 @@ class _StudentClassPageState extends State<StudentClassPage> {
 
         final moduleResponse = await http
             .get(
+              //Uri.parse('http://127.0.0.1:8000/api/student/$studentId/modules'),
               Uri.parse('http://10.0.2.2:8000/api/student/$studentId/modules'),
             )
             .timeout(const Duration(seconds: 10));
