@@ -70,6 +70,7 @@ class _ClassPageState extends State<ClassPage> {
     try {
       final response = await http
           .get(
+            //Uri.parse('http://127.0.0.1:8000/api/lecturer/$lecturerId/classes'),
             Uri.parse('http://10.0.2.2:8000/api/lecturer/$lecturerId/classes'),
           )
           .timeout(const Duration(seconds: 10));
