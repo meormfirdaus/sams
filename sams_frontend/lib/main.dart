@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:sams_frontend/lecturer/mainNavigation.dart' as lecturer_nav;
 import 'package:sams_frontend/student/mainNavigation.dart' as student_nav;
+import 'package:sams_frontend/attendance/lecturer/class.dart';
 import 'package:sams_frontend/treasurer/dashboard_page.dart' as treasurer_page;
 import 'package:sams_frontend/faculty_registrar/mainNavigation.dart' as faculty_reg_nav;
 import 'package:sams_frontend/pusat_adab/mainNavigation.dart' as pusat_adab_nav;
@@ -150,14 +150,14 @@ class _LoginPageState extends State<LoginPage> {
         final resolvedRole = (data['role'] ?? apiRole).toString().trim();
         final normalizedRole = resolvedRole.toLowerCase();
 
-              if (normalizedRole == 'lecturer') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const lecturer_nav.MainNavigation(),
-          ),
-        );
-      } else if (normalizedRole == 'student') {
+        if (normalizedRole == 'lecturer') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const ClassPage(),
+            ),
+          );
+        } else if (normalizedRole == 'student') {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(
