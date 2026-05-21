@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'book_now_page.dart';
-import 'my_booking_page.dart';
+import '../student/book_now_page.dart';
+import '../student/my_booking_page.dart';
 
 class ModuleBookingPage extends StatelessWidget {
   const ModuleBookingPage({super.key});

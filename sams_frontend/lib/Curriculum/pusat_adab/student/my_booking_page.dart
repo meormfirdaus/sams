@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'credit_claim_page.dart';
+import '../student/credit_claim_page.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class MyBookingPage extends StatefulWidget {
