@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'add_courses_page.dart';
 import 'approve_subject_page.dart';
 import 'manage_courses_page.dart';
+import 'report_page.dart';
 import '../main.dart' show LoginPage;
 
 // ✅ This is what main.dart looks for
@@ -323,16 +324,6 @@ class ApprovalPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return const _PlaceholderPage(
         title: 'Approval', icon: Icons.check_circle_outline);
-  }
-}
-
-class ReportPage extends StatelessWidget {
-  const ReportPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const _PlaceholderPage(
-        title: 'Report', icon: Icons.bar_chart_outlined);
   }
 }
 

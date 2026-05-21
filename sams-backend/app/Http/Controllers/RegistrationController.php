@@ -8,7 +8,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 
-class SubjectController extends Controller
+class RegistrationController extends Controller
 {
     public function index(Request $request)
     {
@@ -98,9 +98,9 @@ class SubjectController extends Controller
     public function show($id)
     {
         $subject = Subject::findOrFail($id);
-        $sections = $this->getSubjectClassEntries('lecture_section', $subject->id, 'L');
-        $tutorials = $this->getSubjectClassEntries('lab_section', $subject->id, 'B');
-        $legacySessions = $this->getSubjectLegacySessions($subject->id);
+        $sections = $this->getSubjectTimetableEntries('lecture_section', $subject->id, 'L');
+        $tutorials = $this->getSubjectTimetableEntries('lab_section', $subject->id, 'B');
+        $legacySessions = $this->getSubjectTimetableEntries('class_sessions', $subject->id);
 
         return response()->json([
             'id' => $subject->id,
@@ -168,68 +168,72 @@ class SubjectController extends Controller
 
     public function registeredSubjects($studentId)
     {
+        return $this->registeredSubjectRows($studentId);
+    }
+
+    public function registeredStudentsBySubject($subjectId)
+    {
+        $subject = Subject::findOrFail($subjectId);
+
         if (!Schema::hasTable('subject_registrations')) {
-            return response()->json([]);
+            return response()->json([
+                'subject' => [
+                    'id' => $subject->id,
+                    'code' => $subject->code,
+                    'name' => $subject->name,
+                ],
+                'students' => [],
+            ]);
         }
 
-        $query = DB::table('subject_registrations')
-            ->join('subjects', 'subject_registrations.subject_id', '=', 'subjects.id')
-            ->where('subject_registrations.student_id', $studentId)
-            ->orderBy('subjects.code');
+        $students = DB::table('subject_registrations')
+            ->join('students', 'subject_registrations.student_id', '=', 'students.id')
+            ->join('users', 'students.user_id', '=', 'users.id')
+            ->where('subject_registrations.subject_id', $subjectId)
+            ->select(
+                'students.id as student_id',
+                'users.name',
+                'students.matric_no',
+                'students.year'
+            )
+            ->orderBy('users.name')
+            ->get()
+            ->map(function ($student) {
+                return [
+                    'student_id' => $student->student_id,
+                    'name' => $student->name,
+                    'matric_no' => $student->matric_no,
+                    'year' => $student->year,
+                    'advisor' => $this->getStudentAdvisor((int) $student->student_id),
+                ];
+            });
 
-        $selects = [
-            'subjects.id',
-            'subjects.code',
-            'subjects.name',
-            'subjects.credit_hour',
-            'subject_registrations.id as registration_id',
-        ];
-
-        foreach (['section', 'tutorial_lab'] as $column) {
-            if (Schema::hasColumn('subject_registrations', $column)) {
-                $selects[] = "subject_registrations.$column";
-            }
-        }
-
-        return $query->select($selects)->get()->map(function ($subject) {
-            $sections = $this->getSubjectClassEntries('lecture_section', $subject->id, 'L');
-            $tutorials = $this->getSubjectClassEntries('lab_section', $subject->id, 'B');
-            $legacySessions = $this->getSubjectLegacySessions($subject->id);
-            $timetable = array_merge($sections, $tutorials, $legacySessions);
-            $section = $subject->section ?? $this->firstSectionByMode($timetable, 'L');
-            $tutorialLab = $subject->tutorial_lab ?? $this->firstSectionByMode($timetable, 'B');
-
-            return [
+        return response()->json([
+            'subject' => [
                 'id' => $subject->id,
-                'registration_id' => $subject->registration_id,
                 'code' => $subject->code,
                 'name' => $subject->name,
-                'credit_hour' => $subject->credit_hour,
-                'section' => $section,
-                'tutorial_lab' => $tutorialLab,
-                'time_summary' => $this->buildTimeSummary($timetable, $section, $tutorialLab),
-                'instructors' => $this->getSubjectInstructors($subject->id),
-            ];
-        });
+            ],
+            'students' => $students,
+        ]);
     }
 
-    public function removeRegisteredSubject($studentId, $subjectId)
+    public function removeRegisteredSubject($studentId, $subjectId = null)
     {
-        DB::table('subject_registrations')
-            ->where('student_id', $studentId)
-            ->where('subject_id', $subjectId)
-            ->delete();
+        $query = DB::table('subject_registrations')
+            ->where('student_id', $studentId);
 
-        return response()->json(['message' => 'Subject removed successfully']);
-    }
+        if ($subjectId !== null) {
+            $query->where('subject_id', $subjectId);
+        }
 
-    public function clearRegisteredSubjects($studentId)
-    {
-        DB::table('subject_registrations')
-            ->where('student_id', $studentId)
-            ->delete();
+        $query->delete();
 
-        return response()->json(['message' => 'All subjects removed successfully']);
+        return response()->json([
+            'message' => $subjectId === null
+                ? 'All subjects removed successfully'
+                : 'Subject removed successfully',
+        ]);
     }
 
     public function notifyRegistrar($studentId)
@@ -316,20 +320,20 @@ class SubjectController extends Controller
                 'programme' => $student->programme,
                 'year' => $student->year,
                 'advisor' => $this->getStudentAdvisor((int) $student->student_id),
-                'status' => $this->summarizeApprovalStatus($registrations),
+                'status' => $this->approvalStatusSummary($registrations),
                 'registered_count' => $registrations->count(),
             ];
         });
 
         return response()->json([
-            'counts' => $this->approvalCounts(),
+            'counts' => $this->approvalStatusSummary(),
             'students' => $students,
         ]);
     }
 
     public function studentApprovalSubjects($studentId)
     {
-        $subjects = $this->registeredSubjectRows($studentId)->map(function ($subject) {
+        $subjects = $this->registeredSubjectRows($studentId, true)->map(function ($subject) {
             return $subject + [
                 'status' => $subject['approval_status'] ?? 'Pending',
             ];
@@ -341,7 +345,7 @@ class SubjectController extends Controller
         ]);
     }
 
-    public function updateRegistrationStatus(Request $request, $registrationId)
+    public function updateRegistrationStatus(Request $request, $registrationId = null)
     {
         $validated = $request->validate([
             'status' => ['required', 'in:Pending,Approved,Rejected'],
@@ -353,14 +357,26 @@ class SubjectController extends Controller
             ], 422);
         }
 
-        DB::table('subject_registrations')
-            ->where('id', $registrationId)
+        $studentId = $request->route('studentId');
+        $query = DB::table('subject_registrations');
+
+        if ($studentId !== null) {
+            $query->where('student_id', $studentId);
+        } else {
+            $query->where('id', $registrationId);
+        }
+
+        $query
             ->update([
                 'approval_status' => $validated['status'],
                 'updated_at' => now(),
             ]);
 
-        return response()->json(['message' => 'Registration status updated']);
+        return response()->json([
+            'message' => $studentId !== null
+                ? 'All subjects ' . strtolower($validated['status']) . ' successfully'
+                : 'Registration status updated',
+        ]);
     }
 
     private function insertClassEntries(string $table, int $subjectId, array $entries): void
@@ -413,7 +429,7 @@ class SubjectController extends Controller
         }
     }
 
-    private function registeredSubjectRows($studentId)
+    private function registeredSubjectRows($studentId, bool $includeApprovalStatus = false)
     {
         if (!Schema::hasTable('subject_registrations')) {
             return collect();
@@ -432,86 +448,80 @@ class SubjectController extends Controller
             'subject_registrations.id as registration_id',
         ];
 
-        foreach (['section', 'tutorial_lab', 'approval_status'] as $column) {
+        $optionalColumns = ['section', 'tutorial_lab'];
+
+        if ($includeApprovalStatus) {
+            $optionalColumns[] = 'approval_status';
+        }
+
+        foreach ($optionalColumns as $column) {
             if (Schema::hasColumn('subject_registrations', $column)) {
                 $selects[] = "subject_registrations.$column";
             }
         }
 
         return $query->select($selects)->get()->map(function ($subject) {
-            $sections = $this->getSubjectClassEntries('lecture_section', $subject->id, 'L');
-            $tutorials = $this->getSubjectClassEntries('lab_section', $subject->id, 'B');
-            $legacySessions = $this->getSubjectLegacySessions($subject->id);
+            $sections = $this->getSubjectTimetableEntries('lecture_section', $subject->id, 'L');
+            $tutorials = $this->getSubjectTimetableEntries('lab_section', $subject->id, 'B');
+            $legacySessions = $this->getSubjectTimetableEntries('class_sessions', $subject->id);
             $timetable = array_merge($sections, $tutorials, $legacySessions);
-            $section = $subject->section ?? $this->firstSectionByMode($timetable, 'L');
-            $tutorialLab = $subject->tutorial_lab ?? $this->firstSectionByMode($timetable, 'B');
+            $timing = $this->selectedTimetableDetails(
+                $timetable,
+                $subject->section ?? null,
+                $subject->tutorial_lab ?? null
+            );
 
-            return [
+            $row = [
                 'id' => $subject->id,
                 'registration_id' => $subject->registration_id,
                 'code' => $subject->code,
                 'name' => $subject->name,
                 'credit_hour' => $subject->credit_hour,
-                'section' => $section,
-                'tutorial_lab' => $tutorialLab,
-                'approval_status' => $subject->approval_status ?? 'Pending',
-                'time_summary' => $this->buildTimeSummary($timetable, $section, $tutorialLab),
+                'section' => $timing['section'],
+                'tutorial_lab' => $timing['tutorial_lab'],
+                'time_summary' => $timing['time_summary'],
                 'instructors' => $this->getSubjectInstructors($subject->id),
             ];
+
+            if ($includeApprovalStatus) {
+                $row['approval_status'] = $subject->approval_status ?? 'Pending';
+            }
+
+            return $row;
         });
     }
 
-    // ✅ Approve or reject ALL subjects for a student at once
-    public function updateStudentAllSubjectsStatus(Request $request, $studentId)
-    {
-        $validated = $request->validate([
-            'status' => ['required', 'in:Pending,Approved,Rejected'],
-        ]);
-
-        if (!Schema::hasColumn('subject_registrations', 'approval_status')) {
-            return response()->json([
-                'message' => 'approval_status column is missing. Please run migrations.',
-            ], 422);
-        }
-
-        DB::table('subject_registrations')
-            ->where('student_id', $studentId)
-            ->update([
-                'approval_status' => $validated['status'],
-                'updated_at' => now(),
-            ]);
-
-        return response()->json([
-            'message' => 'All subjects ' . strtolower($validated['status']) . ' successfully',
-        ]);
-    }
-
-    // ✅ Count by unique students, not by subject rows
-    private function approvalCounts(): array
+    private function approvalStatusSummary($registrations = null)
     {
         if (!Schema::hasColumn('subject_registrations', 'approval_status')) {
-            return ['pending' => 0, 'approved' => 0, 'rejected' => 0];
+            return $registrations === null
+                ? ['pending' => 0, 'approved' => 0, 'rejected' => 0]
+                : 'Pending';
         }
 
-        // Get one status per student (summarized)
+        if ($registrations !== null) {
+            $statuses = $registrations
+                ->pluck('approval_status')
+                ->map(fn ($status) => $status ?: 'Pending')
+                ->unique()
+                ->values();
+
+            if ($statuses->count() === 1) {
+                return (string) $statuses->first();
+            }
+
+            if ($statuses->contains('Pending')) {
+                return 'Pending';
+            }
+
+            return 'Mixed';
+        }
+
         $students = DB::table('subject_registrations')
             ->select('student_id', 'approval_status')
             ->get()
             ->groupBy('student_id')
-            ->map(function ($rows) {
-                $statuses = $rows->pluck('approval_status')
-                    ->map(fn($s) => $s ?: 'Pending')
-                    ->unique()
-                    ->values();
-
-                if ($statuses->count() === 1) {
-                    return $statuses->first();
-                }
-                if ($statuses->contains('Pending')) {
-                    return 'Pending';
-                }
-                return 'Mixed';
-            });
+            ->map(fn ($rows) => $this->approvalStatusSummary($rows));
 
         $pending  = $students->filter(fn($s) => $s === 'Pending')->count();
         $approved = $students->filter(fn($s) => $s === 'Approved')->count();
@@ -522,29 +532,6 @@ class SubjectController extends Controller
             'approved' => $approved,
             'rejected' => $rejected,
         ];
-    }
-
-    private function summarizeApprovalStatus($registrations): string
-    {
-        if (!Schema::hasColumn('subject_registrations', 'approval_status')) {
-            return 'Pending';
-        }
-
-        $statuses = $registrations
-            ->pluck('approval_status')
-            ->map(fn ($status) => $status ?: 'Pending')
-            ->unique()
-            ->values();
-
-        if ($statuses->count() === 1) {
-            return (string) $statuses->first();
-        }
-
-        if ($statuses->contains('Pending')) {
-            return 'Pending';
-        }
-
-        return 'Mixed';
     }
 
     private function approvalStudentInfo($studentId): ?array
@@ -624,96 +611,93 @@ class SubjectController extends Controller
         return $instructors;
     }
 
-    private function getSubjectClassEntries(string $table, int $subjectId, string $mode): array
+    private function getSubjectTimetableEntries(string $table, int $subjectId, string $mode = ''): array
     {
         if (!Schema::hasTable($table) || !Schema::hasColumn($table, 'subject_id')) {
             return [];
         }
 
+        if ($table === 'class_sessions') {
+            return DB::table($table)
+                ->where('subject_id', $subjectId)
+                ->get()
+                ->map(function ($row) {
+                    $sessionType = strtolower((string) ($row->session_type ?? ''));
+                    $mode = str_contains($sessionType, 'tutorial') || str_contains($sessionType, 'lab')
+                        ? 'B'
+                        : 'L';
+                    $startTime = (string) ($row->start_time ?? '');
+                    $endTime = (string) ($row->end_time ?? '');
+                    $start = $startTime === '' ? '' : substr($startTime, 0, 5);
+                    $end = $endTime === '' ? '' : substr($endTime, 0, 5);
+
+                    return [
+                        'id' => $row->id ?? null,
+                        'section' => (string) ($row->section ?? ''),
+                        'day' => $row->class_date ? strtoupper(date('D', strtotime($row->class_date))) : '',
+                        'time' => trim($start . '-' . $end, '-'),
+                        'location' => (string) ($row->venue ?? ''),
+                        'mode' => $mode,
+                        'capacity' => '',
+                        'instructor' => '',
+                    ];
+                })
+                ->values()
+                ->all();
+        }
+
+        $value = function (object $row, array $columns): string {
+            foreach ($columns as $column) {
+                if (property_exists($row, $column) && $row->{$column} !== null) {
+                    return (string) $row->{$column};
+                }
+            }
+
+            return '';
+        };
+
         return DB::table($table)
             ->where('subject_id', $subjectId)
             ->get()
-            ->map(function ($row) use ($table, $mode) {
+            ->map(function ($row) use ($mode, $value) {
                 return [
                     'id' => $row->id ?? null,
-                    'section' => $this->firstExistingValue(
+                    'section' => $value(
                         $row,
                         ['section_name', 'section', 'name', 'lab_name', 'tutorial_name']
                     ),
-                    'day' => $this->firstExistingValue($row, ['day']),
-                    'time' => $this->firstExistingValue($row, ['time']),
-                    'location' => $this->firstExistingValue($row, ['room', 'location']),
+                    'day' => $value($row, ['day']),
+                    'time' => $value($row, ['time']),
+                    'location' => $value($row, ['room', 'location']),
                     'mode' => $mode,
-                    'capacity' => $this->firstExistingValue($row, ['capacity']),
-                    'instructor' => $this->firstExistingValue($row, ['instructor', 'instructor_name']),
+                    'capacity' => $value($row, ['capacity']),
+                    'instructor' => $value($row, ['instructor', 'instructor_name']),
                 ];
             })
             ->values()
             ->all();
     }
 
-    private function getSubjectLegacySessions(int $subjectId): array
-    {
-        if (!Schema::hasTable('class_sessions') || !Schema::hasColumn('class_sessions', 'subject_id')) {
-            return [];
-        }
-
-        return DB::table('class_sessions')
-            ->where('subject_id', $subjectId)
-            ->get()
-            ->map(function ($row) {
-                $sessionType = strtolower((string) ($row->session_type ?? ''));
-                $mode = str_contains($sessionType, 'tutorial') || str_contains($sessionType, 'lab')
-                    ? 'B'
-                    : 'L';
-
-                return [
-                    'id' => $row->id ?? null,
-                    'section' => (string) ($row->section ?? ''),
-                    'day' => $row->class_date ? strtoupper(date('D', strtotime($row->class_date))) : '',
-                    'time' => $this->formatTimeRange($row->start_time ?? '', $row->end_time ?? ''),
-                    'location' => (string) ($row->venue ?? ''),
-                    'mode' => $mode,
-                    'capacity' => '',
-                    'instructor' => '',
-                ];
-            })
-            ->values()
-            ->all();
-    }
-
-    private function formatTimeRange(string $startTime, string $endTime): string
-    {
-        if ($startTime === '' && $endTime === '') {
-            return '';
-        }
-
-        $start = $startTime === '' ? '' : substr($startTime, 0, 5);
-        $end = $endTime === '' ? '' : substr($endTime, 0, 5);
-
-        return trim($start . '-' . $end, '-');
-    }
-
-    private function firstSectionByMode(array $timetable, string $mode): string
-    {
-        foreach ($timetable as $entry) {
-            if (($entry['mode'] ?? '') === $mode && ($entry['section'] ?? '') !== '') {
-                return (string) $entry['section'];
-            }
-        }
-
-        return '';
-    }
-
-    private function buildTimeSummary(array $timetable, ?string $section, ?string $tutorialLab): string
+    private function selectedTimetableDetails(array $timetable, ?string $section, ?string $tutorialLab): array
     {
         $matches = [];
+        $section = (string) ($section ?? '');
+        $tutorialLab = (string) ($tutorialLab ?? '');
 
         foreach ($timetable as $entry) {
             $mode = $entry['mode'] ?? '';
             $entrySection = (string) ($entry['section'] ?? '');
-            $isSelectedLecture = $mode === 'L' && $entrySection === (string) $section;
-            $isSelectedTutorial = $mode === 'B' && $entrySection === (string) $tutorialLab;
+
+            if ($section === '' && $mode === 'L' && $entrySection !== '') {
+                $section = $entrySection;
+            }
+
+            if ($tutorialLab === '' && $mode === 'B' && $entrySection !== '') {
+                $tutorialLab = $entrySection;
+            }
+
+            $isSelectedLecture = $mode === 'L' && $entrySection === $section;
+            $isSelectedTutorial = $mode === 'B' && $entrySection === $tutorialLab;
 
             if (!$isSelectedLecture && !$isSelectedTutorial) {
                 continue;
@@ -728,17 +712,11 @@ class SubjectController extends Controller
             }
         }
 
-        return implode(' | ', $matches);
+        return [
+            'section' => $section,
+            'tutorial_lab' => $tutorialLab,
+            'time_summary' => implode(' | ', $matches),
+        ];
     }
 
-    private function firstExistingValue(object $row, array $columns): string
-    {
-        foreach ($columns as $column) {
-            if (property_exists($row, $column) && $row->{$column} !== null) {
-                return (string) $row->{$column};
-            }
-        }
-
-        return '';
-    }
 }

@@ -58,16 +58,33 @@ class _StudentClassPageState extends State<StudentClassPage> {
 
     try {
       final response = await http
+<<<<<<< HEAD:sams_frontend/lib/attendance/student/class.dart
           .get(Uri.parse('http://10.0.2.2:8000/api/student/$id/subjects'))
           .timeout(const Duration(seconds: 10));
 
       final moduleResponse = await http
           .get(Uri.parse('http://10.0.2.2:8000/api/student/$id/modules'))
+=======
+          .get(
+            // Uri.parse('http://10.0.2.2:8000/api/student/$studentId/subjects'),
+            Uri.parse('http://127.0.0.1:8000/api/student/$studentId/subjects'),
+          )
+>>>>>>> 2fdd6b7 (update):sams_frontend/lib/student/class.dart
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode == 200) {
         final List data = json.decode(response.body);
 
+<<<<<<< HEAD:sams_frontend/lib/attendance/student/class.dart
+=======
+        final moduleResponse = await http
+            .get(
+              // Uri.parse('http://10.0.2.2:8000/api/student/$studentId/modules'),
+              Uri.parse('http://127.0.0.1:8000/api/student/$studentId/modules'),
+            )
+            .timeout(const Duration(seconds: 10));
+
+>>>>>>> 2fdd6b7 (update):sams_frontend/lib/student/class.dart
         List moduleData = [];
         if (moduleResponse.statusCode == 200) {
           moduleData = json.decode(moduleResponse.body);

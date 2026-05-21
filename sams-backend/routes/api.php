@@ -3,25 +3,26 @@
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AttendanceController;
-use App\Http\Controllers\SubjectController;
+use App\Http\Controllers\RegistrationController;
 use App\Http\Controllers\Api\ModuleController;
 
 
 //deli
 Route::post('/login', [AuthController::class, 'login']);
-Route::get('/subjects', [SubjectController::class, 'index']);
-Route::post('/subjects', [SubjectController::class, 'store']);
-Route::post('/subjects/register', [SubjectController::class, 'register']);
-Route::get('/students/{studentId}/registered-subjects', [SubjectController::class, 'registeredSubjects']);
-Route::delete('/students/{studentId}/registered-subjects', [SubjectController::class, 'clearRegisteredSubjects']);
-Route::delete('/students/{studentId}/registered-subjects/{subjectId}', [SubjectController::class, 'removeRegisteredSubject']);
-Route::post('/students/{studentId}/notify-registrar', [SubjectController::class, 'notifyRegistrar']);
-Route::get('/subject-approvals', [SubjectController::class, 'approvalRequests']);
-Route::get('/subject-approvals/{studentId}/subjects', [SubjectController::class, 'studentApprovalSubjects']);
-Route::post('/subject-approvals/registrations/{registrationId}/status', [SubjectController::class, 'updateRegistrationStatus']);
-Route::post('/subject-approvals/student/{studentId}/status', [SubjectController::class, 'updateStudentAllSubjectsStatus']); // ✅ NEW
-Route::get('/subjects/{id}', [SubjectController::class, 'show']);
-Route::delete('/subjects/{id}', [SubjectController::class, 'destroy']);
+Route::get('/subjects', [RegistrationController::class, 'index']);
+Route::post('/subjects', [RegistrationController::class, 'store']);
+Route::post('/subjects/register', [RegistrationController::class, 'register']);
+Route::get('/subjects/{subjectId}/registered-students', [RegistrationController::class, 'registeredStudentsBySubject']);
+Route::get('/students/{studentId}/registered-subjects', [RegistrationController::class, 'registeredSubjects']);
+Route::delete('/students/{studentId}/registered-subjects', [RegistrationController::class, 'removeRegisteredSubject']);
+Route::delete('/students/{studentId}/registered-subjects/{subjectId}', [RegistrationController::class, 'removeRegisteredSubject']);
+Route::post('/students/{studentId}/notify-registrar', [RegistrationController::class, 'notifyRegistrar']);
+Route::get('/subject-approvals', [RegistrationController::class, 'approvalRequests']);
+Route::get('/subject-approvals/{studentId}/subjects', [RegistrationController::class, 'studentApprovalSubjects']);
+Route::post('/subject-approvals/registrations/{registrationId}/status', [RegistrationController::class, 'updateRegistrationStatus']);
+Route::post('/subject-approvals/student/{studentId}/status', [RegistrationController::class, 'updateRegistrationStatus']); // ✅ NEW
+Route::get('/subjects/{id}', [RegistrationController::class, 'show']);
+Route::delete('/subjects/{id}', [RegistrationController::class, 'destroy']);
 
 //nana
 Route::get('/lecturer/{id}/classes', [AttendanceController::class, 'getLecturerClasses']);
