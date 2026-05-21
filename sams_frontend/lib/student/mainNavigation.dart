@@ -4,7 +4,7 @@ import '../subject/student/homepage.dart';
 import '../attendance/student/class.dart';
 import '../subject/student/register_courses.dart';
 
-import '../Curriculum/pusat_adab/student/curriculum_page.dart';
+import '../Curriculum/student/curriculum_page.dart';
 import '../tuition_fee/student/fee_dashboard.dart';
 
 

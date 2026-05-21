@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../student/module_booking_page.dart';
-import '../student/credit_claim_page.dart';
+import 'module_booking_page.dart';
+import 'credit_claim_page.dart';
 
 class CurriculumPage extends StatelessWidget {
   const CurriculumPage({super.key});
