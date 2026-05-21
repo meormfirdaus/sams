@@ -6,10 +6,12 @@ import 'module_model.dart';
 
 class AvailableClassesPage extends StatefulWidget {
   final ModuleModel module;
+  final int studentId;
 
   const AvailableClassesPage({
     super.key,
     required this.module,
+    required this.studentId,
   });
 
   @override
@@ -20,8 +22,6 @@ class _AvailableClassesPageState extends State<AvailableClassesPage> {
   bool _isLoading = true;
   String _errorMessage = '';
   List<dynamic> _schedules = [];
-
-  int? _studentId;
 
   int? _resolvedStudentId;
 
@@ -34,19 +34,17 @@ class _AvailableClassesPageState extends State<AvailableClassesPage> {
   }
 
   Future<void> _initPage() async {
-    final prefs = await SharedPreferences.getInstance();
-    _studentId = prefs.getInt('student_id');
-    _loadStudentIdAndFetchSchedules();
+    await _loadStudentIdAndFetchSchedules();
   }
 
   Future<void> _loadStudentIdAndFetchSchedules() async {
     final prefs = await SharedPreferences.getInstance();
     final savedStudentId = prefs.getInt('student_id');
 
+    if (!mounted) return;
     setState(() {
       _resolvedStudentId = savedStudentId ?? widget.studentId;
     });
-
 
     await fetchSchedules();
   }
@@ -54,24 +52,26 @@ class _AvailableClassesPageState extends State<AvailableClassesPage> {
   Future<void> fetchSchedules() async {
     try {
       final response = await http.get(
-        //Uri.parse('http://:127.0.0.1:8000/api/modules/${widget.module.id}/schedules'),
-        Uri.parse('http://:10.0.2.2:8000/api/modules/${widget.module.id}/schedules'),
+        Uri.parse('http://10.0.2.2:8000/api/modules/${widget.module.id}/schedules'),
       );
 
       if (response.statusCode == 200) {
         final decoded = jsonDecode(response.body);
 
+        if (!mounted) return;
         setState(() {
-          _schedules = decoded['data'];
+          _schedules = decoded['data'] ?? [];
           _isLoading = false;
         });
       } else {
+        if (!mounted) return;
         setState(() {
           _errorMessage = 'Failed to load available classes';
           _isLoading = false;
         });
       }
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _errorMessage = 'Error: $e';
         _isLoading = false;
@@ -82,7 +82,7 @@ class _AvailableClassesPageState extends State<AvailableClassesPage> {
   Future<void> bookSchedule(int scheduleId) async {
     final studentId = _resolvedStudentId ?? widget.studentId;
     try {
-      if (_studentId == null) {
+      if (studentId <= 0) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Student ID not found. Please login again.')),
         );
@@ -288,13 +288,9 @@ class _AvailableClassesPageState extends State<AvailableClassesPage> {
                                       width: double.infinity,
                                       padding: const EdgeInsets.symmetric(vertical: 10),
                                       decoration: BoxDecoration(
-
-                                        color: isFull ? Colors.grey : primaryColor,
-
                                         color: isFull
                                             ? Colors.grey
                                             : (studentMissing ? Colors.grey : primaryColor),
-
                                         borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Text(

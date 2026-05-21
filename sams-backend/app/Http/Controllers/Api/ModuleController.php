@@ -9,14 +9,9 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Module;
 use Illuminate\Http\JsonResponse;
-<<<<<<< HEAD
-use Illuminate\Support\Facades\DB;
-use Carbon\Carbon;
-=======
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
->>>>>>> origin/main
 
 class ModuleController extends Controller
 {
@@ -184,7 +179,6 @@ class ModuleController extends Controller
             'data' => $registration,
         ]);
     }
-<<<<<<< HEAD
     public function myBookings(Request $request): JsonResponse
     {
         $studentId = $request->query('student_id');
@@ -402,8 +396,6 @@ class ModuleController extends Controller
         ]);
     }
 
-}
-=======
 
     private function resolveStudentId($incomingStudentId): ?int
     {
@@ -446,4 +438,3 @@ class ModuleController extends Controller
         return null;
     }
 }
->>>>>>> origin/main

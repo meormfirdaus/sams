@@ -57,7 +57,11 @@ class _BookNowPageState extends State<BookNowPage> {
       }
 
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:8000/api/modules'),
+        Uri.parse('http://10.0.2.2:8000/api/modules').replace(
+          queryParameters: {
+            'student_id': _studentId.toString(),
+          },
+        ),
       );
 
       if (response.statusCode == 200) {
@@ -76,7 +80,7 @@ class _BookNowPageState extends State<BookNowPage> {
         });
       } else {
         setState(() {
-          _errorMessage = 'Failed to load modules';
+          _errorMessage = 'Failed to load modules (${response.statusCode})';
           _isLoading = false;
         });
       }

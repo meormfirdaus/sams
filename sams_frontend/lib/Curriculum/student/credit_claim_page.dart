@@ -130,15 +130,16 @@ class _CreditClaimPageState extends State<CreditClaimPage> {
   }
 
   String actionText(Map<String, dynamic> item) {
-    final bool canClaim = item['can_claim'] == true;
-    final String status = (item['claim_status'] ?? '--').toString().toUpperCase();
+    final String status =
+        (item['claim_status'] ?? '--').toString().toUpperCase();
 
     if (status == 'APPROVED') return 'Successfully Claim';
-    if (status == 'IN PROGRESS' || status == 'REJECTED') return 'Claim Closed';
-    if (canClaim) return 'Claim Now';
-    return 'Claim Closed';
-  }
+    if (status == 'IN PROGRESS') return 'In Progress';
+    if (status == 'REJECTED') return 'Rejected';
 
+    return 'Claim Now';
+  }
+  
   Color actionColor(Map<String, dynamic> item) {
     final bool canClaim = item['can_claim'] == true;
     final String status = (item['claim_status'] ?? '--').toString().toUpperCase();
@@ -152,11 +153,11 @@ class _CreditClaimPageState extends State<CreditClaimPage> {
   }
 
   bool canTapClaim(Map<String, dynamic> item) {
-    final bool canClaim = item['can_claim'] == true;
-    final String status = (item['claim_status'] ?? '--').toString().toUpperCase();
-    return canClaim && status == '--';
-  }
+    final String status =
+        (item['claim_status'] ?? '--').toString().toUpperCase();
 
+    return status == '--';
+  }
   Widget _buildHeader() {
     const primaryColor = Color(0xFF3FC7C4);
 
