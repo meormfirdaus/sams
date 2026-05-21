@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'module_booking_page.dart';
+import 'credit_claim_page.dart';
 
 class CurriculumPage extends StatelessWidget {
   const CurriculumPage({super.key});
@@ -14,14 +15,10 @@ class CurriculumPage extends StatelessWidget {
         child: Column(
           children: [
             Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+             width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 28),
               decoration: const BoxDecoration(
-                color: primaryColor,
-                borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(6),
-                  bottomRight: Radius.circular(6),
-                ),
+                color: Color(0xFF67C5C4),
               ),
               child: const Text(
                 'Curriculum Dashboard',
@@ -29,6 +26,7 @@ class CurriculumPage extends StatelessWidget {
                   color: Colors.white,
                   fontSize: 20,
                   fontWeight: FontWeight.w700,
+                  fontFamily: 'Nunito',
                 ),
               ),
             ),
@@ -118,12 +116,19 @@ class CurriculumModuleCard extends StatelessWidget {
               builder: (context) => const ModuleBookingPage(),
             ),
           );
+        } else if (title == 'Credit Claim') {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const CreditClaimPage(),
+            ),
+          );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('$title tapped')),
           );
         }
-      },
+},
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
         decoration: BoxDecoration(

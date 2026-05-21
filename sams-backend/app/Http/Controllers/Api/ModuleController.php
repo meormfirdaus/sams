@@ -4,13 +4,19 @@ namespace App\Http\Controllers\Api;
 
 use App\Models\ModuleSchedule;
 use App\Models\ModuleRegistration;
+use App\Models\ModuleAttendance;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\Module;
 use Illuminate\Http\JsonResponse;
+<<<<<<< HEAD
+use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
+=======
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
+>>>>>>> origin/main
 
 class ModuleController extends Controller
 {
@@ -178,6 +184,226 @@ class ModuleController extends Controller
             'data' => $registration,
         ]);
     }
+<<<<<<< HEAD
+    public function myBookings(Request $request): JsonResponse
+    {
+        $studentId = $request->query('student_id');
+
+        if (!$studentId) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Student ID is required.',
+            ], 400);
+        }
+
+        $registrations = ModuleRegistration::with(['module', 'schedule'])
+            ->where('student_id', $studentId)
+            ->orderByDesc('id')
+            ->get();
+
+        $data = $registrations->map(function ($registration) {
+            $canCancel = false;
+
+            if ($registration->schedule && $registration->schedule->class_date) {
+                $scheduleDate = Carbon::parse($registration->schedule->class_date);
+                $today = Carbon::today();
+
+                // boleh cancel sebelum hari event sahaja
+                $canCancel = $today->lt($scheduleDate);
+            }
+
+            $attendanceStatus = '--';
+            $attendancePercentage = '--';
+
+            $attendance = ModuleAttendance::where('student_id', $registration->student_id)
+                ->where('module_session_id', $registration->module_schedule_id)
+                ->latest()
+                ->first();
+
+            if ($attendance) {
+                $attendanceStatus = $attendance->status ?? '--';
+
+                if (strtoupper($attendanceStatus) === 'PRESENT') {
+                    $attendancePercentage = '98%';
+                } elseif (strtoupper($attendanceStatus) === 'ABSENT') {
+                    $attendancePercentage = '--';
+                } elseif (strtoupper($attendanceStatus) === 'LATE') {
+                    $attendancePercentage = '80%';
+                }
+            }
+
+            return [
+                'registration_id' => $registration->id,
+                'module_id' => $registration->module_id,
+                'code' => $registration->module->code ?? '',
+                'name' => $registration->module->name ?? '',
+                'venue' => $registration->schedule->venue ?? '',
+                'class_date' => $registration->schedule->class_date ?? '',
+                'start_time' => $registration->schedule->start_time ?? '',
+                'end_time' => $registration->schedule->end_time ?? '',
+                'cats' => 2,
+                'attendance_status' => $attendanceStatus,
+                'attendance_percentage' => $attendancePercentage,
+                'can_cancel' => $canCancel,
+            ];
+        });
+
+        return response()->json([
+            'status' => true,
+            'data' => $data,
+        ]);
+    }
+
+    public function cancelBooking($registrationId): JsonResponse
+    {
+        $registration = ModuleRegistration::with('schedule')->findOrFail($registrationId);
+
+        if (!$registration->schedule || !$registration->schedule->class_date) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Schedule information not found.',
+            ], 400);
+        }
+
+        $scheduleDate = Carbon::parse($registration->schedule->class_date);
+        $today = Carbon::today();
+
+        if (!$today->lt($scheduleDate)) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Cancellation is not allowed on the event day.',
+            ], 400);
+        }
+
+        $schedule = ModuleSchedule::find($registration->module_schedule_id);
+
+        if ($schedule && $schedule->booked_count > 0) {
+            $schedule->booked_count = $schedule->booked_count - 1;
+
+            if ($schedule->status === 'full' && $schedule->booked_count < $schedule->capacity) {
+                $schedule->status = 'available';
+            }
+
+            $schedule->save();
+        }
+
+        $registration->delete();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Booking cancelled successfully.',
+        ]);
+    }
+
+    public function creditClaims(Request $request): JsonResponse
+{
+    $studentId = $request->query('student_id');
+
+    if (!$studentId) {
+        return response()->json([
+            'status' => false,
+            'message' => 'Student ID is required.',
+        ], 400);
+    }
+
+    $registrations = ModuleRegistration::with(['module', 'schedule'])
+        ->where('student_id', $studentId)
+        ->orderByDesc('id')
+        ->get();
+
+    $data = $registrations->map(function ($registration) {
+        $attendance = ModuleAttendance::where('student_id', $registration->student_id)
+            ->where('module_session_id', $registration->module_schedule_id)
+            ->latest()
+            ->first();
+
+        $attendanceStatus = strtoupper($attendance->status ?? '--');
+        $progress = $attendanceStatus === 'PRESENT';
+
+        $claim = DB::table('credit_claims')
+            ->where('registration_id', $registration->id)
+            ->latest('id')
+            ->first();
+
+        $claimStatus = $claim->status ?? '--';
+
+        return [
+            'registration_id' => $registration->id,
+            'module_id' => $registration->module_id,
+            'code' => $registration->module->code ?? '',
+            'name' => $registration->module->name ?? '',
+            'attendance_status' => $attendanceStatus,
+            'progress_completed' => $progress,
+            'claim_status' => strtoupper($claimStatus),
+            'can_claim' => $progress && !$claim,
+        ];
+    });
+
+    return response()->json([
+        'status' => true,
+        'data' => $data,
+    ]);
+}
+
+    public function applyCreditClaim(Request $request): JsonResponse
+    {
+        $request->validate([
+            'registration_id' => 'required|integer',
+            'student_id' => 'required|integer',
+        ]);
+
+        $registration = ModuleRegistration::with(['module', 'schedule'])
+            ->where('id', $request->registration_id)
+            ->where('student_id', $request->student_id)
+            ->first();
+
+        if (!$registration) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Registration not found.',
+            ], 404);
+        }
+
+        $attendance = ModuleAttendance::where('student_id', $registration->student_id)
+            ->where('module_session_id', $registration->module_schedule_id)
+            ->latest()
+            ->first();
+
+        if (!$attendance || strtoupper($attendance->status ?? '') !== 'PRESENT') {
+            return response()->json([
+                'status' => false,
+                'message' => 'Credit claim is only allowed after successful attendance.',
+            ], 400);
+        }
+
+        $existingClaim = DB::table('credit_claims')
+            ->where('registration_id', $registration->id)
+            ->first();
+
+        if ($existingClaim) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Credit claim already submitted.',
+            ], 400);
+        }
+
+        DB::table('credit_claims')->insert([
+            'registration_id' => $registration->id,
+            'student_id' => $registration->student_id,
+            'module_id' => $registration->module_id,
+            'status' => 'IN PROGRESS',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Credit claim submitted successfully.',
+        ]);
+    }
+
+}
+=======
 
     private function resolveStudentId($incomingStudentId): ?int
     {
@@ -220,3 +446,4 @@ class ModuleController extends Controller
         return null;
     }
 }
+>>>>>>> origin/main

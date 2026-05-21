@@ -44,6 +44,12 @@ Route::delete('/attendance/records/{attendanceId}', [AttendanceController::class
 Route::get('/modules', [ModuleController::class, 'index']);
 Route::get('/modules/{id}/schedules', [ModuleController::class, 'schedules']);
 Route::post('/modules/book', [ModuleController::class, 'book']);
+<<<<<<< HEAD
+Route::get('/modules/my-bookings', [ModuleController::class, 'myBookings']);
+Route::delete('/modules/bookings/{registrationId}/cancel', [ModuleController::class, 'cancelBooking']);
+Route::get('/modules/credit-claims', [ModuleController::class, 'creditClaims']);
+Route::post('/modules/credit-claims/apply', [ModuleController::class, 'applyCreditClaim']);
+=======
 
 //izzah
 use App\Http\Controllers\FeeController;
@@ -62,3 +68,4 @@ Route::prefix('tuition')->group(function () {
     Route::post('/treasurer/payment/{paymentId}/reject', [FeeController::class, 'rejectPayment']);
     Route::get('/treasurer/records', [FeeController::class, 'getPaymentRecords']);
 });
+>>>>>>> origin/main

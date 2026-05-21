@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'book_now_page.dart';
+import 'my_booking_page.dart';
 
 class ModuleBookingPage extends StatelessWidget {
   const ModuleBookingPage({super.key});
@@ -19,8 +20,8 @@ class ModuleBookingPage extends StatelessWidget {
               decoration: const BoxDecoration(
                 color: primaryColor,
                 borderRadius: BorderRadius.only(
-                  bottomLeft: Radius.circular(18),
-                  bottomRight: Radius.circular(18),
+                  // bottomLeft: Radius.circular(18),
+                  // bottomRight: Radius.circular(18),
                 ),
               ),
               child: Row(
@@ -86,9 +87,17 @@ class ModuleBookingPage extends StatelessWidget {
                             );
                           },
                         ),
-                        const ModuleBookingCard(
+                        ModuleBookingCard(
                           title: 'My Booking',
                           imagePath: 'assets/images/my_booking.png',
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const MyBookingPage(),
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),
