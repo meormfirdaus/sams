@@ -60,12 +60,10 @@ class _TreasurerFeeDashboardPageState
 
     try {
       // change this to your real backend URL
-<<<<<<< HEAD:sams_frontend/lib/tuition_fee/treasurer/dashboard_page.dart
+
       const String baseUrl = 'http://10.0.2.2:8000/api';
-=======
-      // const String baseUrl = 'http://10.0.2.2:8000/api';
-      const String baseUrl = 'http://127.0.0.1:8000/api';
->>>>>>> 2fdd6b7 (update):sams_frontend/lib/treasurer/dashboard_page.dart
+      //const String baseUrl = 'http://127.0.0.1:8000/api';
+
 
       final queryParams = <String, String>{};
 

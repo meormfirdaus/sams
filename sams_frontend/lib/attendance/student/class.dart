@@ -44,85 +44,62 @@ class _StudentClassPageState extends State<StudentClassPage> {
     await fetchRegisteredSubjectsWithId(studentId);
   }
 
-  Future<void> fetchRegisteredSubjectsWithId(int id) async {
-    setState(() => isLoading = true);
+Future<void> fetchRegisteredSubjectsWithId(int id) async {
+  setState(() => isLoading = true);
 
-    if (id == 0) {
-      setState(() {
-        bookedCourses = [];
-        bookedModules = [];
-        isLoading = false;
-      });
-      return;
-    }
-
-    try {
-      final response = await http
-<<<<<<< HEAD:sams_frontend/lib/attendance/student/class.dart
-          .get(Uri.parse('http://10.0.2.2:8000/api/student/$id/subjects'))
-          .timeout(const Duration(seconds: 10));
-
-      final moduleResponse = await http
-          .get(Uri.parse('http://10.0.2.2:8000/api/student/$id/modules'))
-=======
-          .get(
-            // Uri.parse('http://10.0.2.2:8000/api/student/$studentId/subjects'),
-            Uri.parse('http://127.0.0.1:8000/api/student/$studentId/subjects'),
-          )
->>>>>>> 2fdd6b7 (update):sams_frontend/lib/student/class.dart
-          .timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        final List data = json.decode(response.body);
-
-<<<<<<< HEAD:sams_frontend/lib/attendance/student/class.dart
-=======
-        final moduleResponse = await http
-            .get(
-              // Uri.parse('http://10.0.2.2:8000/api/student/$studentId/modules'),
-              Uri.parse('http://127.0.0.1:8000/api/student/$studentId/modules'),
-            )
-            .timeout(const Duration(seconds: 10));
-
->>>>>>> 2fdd6b7 (update):sams_frontend/lib/student/class.dart
-        List moduleData = [];
-        if (moduleResponse.statusCode == 200) {
-          moduleData = json.decode(moduleResponse.body);
-        }
-
-        setState(() {
-          bookedCourses = data
-              .map<Map<String, dynamic>>((item) => {
-                    'id': item['id'],
-                    'subject_id': item['subject_id'],
-                    'code': item['code']?.toString() ?? '',
-                    'name': item['name']?.toString() ?? '',
-                    'attendanceEnabled': true,
-                  })
-              .toList();
-
-          bookedModules = moduleData
-              .map<Map<String, dynamic>>((item) => {
-                    'id': item['id'],
-                    'module_id': item['module_id'],
-                    'code': item['code']?.toString() ?? '',
-                    'name': item['name']?.toString() ?? '',
-                    'attendanceEnabled': true,
-                  })
-              .toList();
-
-          isLoading = false;
-        });
-      } else {
-        debugPrint('Student subjects API failed: ${response.statusCode}');
-        debugPrint('Student subjects API body: ${response.body}');
-        setState(() => isLoading = false);
-      }
-    } catch (e) {
-      debugPrint('Error fetching registered subjects/modules: $e');
-      setState(() => isLoading = false);
-    }
+  if (id == 0) {
+    setState(() {
+      bookedCourses = [];
+      bookedModules = [];
+      isLoading = false;
+    });
+    return;
   }
+
+  try {
+    final response = await http
+        .get(Uri.parse('http://10.0.2.2:8000/api/student/$id/subjects'))
+        .timeout(const Duration(seconds: 10));
+
+    final moduleResponse = await http
+        .get(Uri.parse('http://10.0.2.2:8000/api/student/$id/modules'))
+        .timeout(const Duration(seconds: 10));
+
+    List data = [];
+    List moduleData = [];
+
+    if (response.statusCode == 200) {
+      data = json.decode(response.body);
+    }
+
+    if (moduleResponse.statusCode == 200) {
+      moduleData = json.decode(moduleResponse.body);
+    }
+
+    setState(() {
+      bookedCourses = data.map<Map<String, dynamic>>((item) => {
+            'id': item['id'],
+            'subject_id': item['subject_id'],
+            'code': item['code']?.toString() ?? '',
+            'name': item['name']?.toString() ?? '',
+            'attendanceEnabled': true,
+          }).toList();
+
+      bookedModules = moduleData.map<Map<String, dynamic>>((item) => {
+            'id': item['id'],
+            'module_id': item['module_id'],
+            'code': item['code']?.toString() ?? '',
+            'name': item['name']?.toString() ?? '',
+            'attendanceEnabled': true,
+          }).toList();
+
+      isLoading = false;
+    });
+  } catch (e) {
+    debugPrint('Error fetching data: $e');
+    setState(() => isLoading = false);
+  }
+}
 
   @override
   Widget build(BuildContext context) {

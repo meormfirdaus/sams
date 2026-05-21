@@ -48,12 +48,10 @@ class _ManageCoursesPageState extends State<ManageCoursesPage> {
     setState(() => isLoading = true);
     try {
       final res = await http
-<<<<<<< HEAD
+
           .get(Uri.parse('http://10.0.2.2:8000/api/subjects'))
-=======
-          // .get(Uri.parse('http://10.0.2.2:8000/api/subjects'))
-          .get(Uri.parse('http://127.0.0.1:8000/api/subjects'))
->>>>>>> 2fdd6b7 (update)
+          //.get(Uri.parse('http://127.0.0.1:8000/api/subjects'))
+
           .timeout(const Duration(seconds: 10));
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
@@ -100,12 +98,10 @@ class _ManageCoursesPageState extends State<ManageCoursesPage> {
 
     try {
       final res = await http.delete(
-<<<<<<< HEAD
+
         Uri.parse('http://10.0.2.2:8000/api/subjects/$id'),
-=======
-        // Uri.parse('http://10.0.2.2:8000/api/subjects/$id'),
-        Uri.parse('http://127.0.0.1:8000/api/subjects/$id'),
->>>>>>> 2fdd6b7 (update)
+        //Uri.parse('http://127.0.0.1:8000/api/subjects/$id'),
+
         headers: {'Accept': 'application/json'},
       );
       if (!mounted) return;

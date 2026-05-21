@@ -4,7 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sams_frontend/student/mainNavigation.dart' as student_nav;
 import 'package:sams_frontend/attendance/lecturer/class.dart';
-import 'package:sams_frontend/treasurer/dashboard_page.dart' as treasurer_page;
+import 'package:sams_frontend/tuition_fee/treasurer/dashboard_page.dart' as treasurer_page;
 import 'package:sams_frontend/faculty_registrar/mainNavigation.dart' as faculty_reg_nav;
 import 'package:sams_frontend/pusat_adab/mainNavigation.dart' as pusat_adab_nav;
 
@@ -91,13 +91,10 @@ class _LoginPageState extends State<LoginPage> {
 
     try {
       final response = await http.post(
-<<<<<<< HEAD
+
         //Uri.parse('http://10.62.79.61:8000/api/login'),
         Uri.parse('http://10.0.2.2:8000/api/login'),
-=======
-        // Uri.parse('http://10.0.2.2:8000/api/login'),
-        Uri.parse('http://127.0.0.1:8000/api/login'),
->>>>>>> 2fdd6b7 (update)
+
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',

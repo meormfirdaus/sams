@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'add_courses_page.dart';
-import 'approve_subject_page.dart';
-import 'manage_courses_page.dart';
-import 'report_page.dart';
+import '../subject/student/faculty_registar/add_courses_page.dart';
+import '../subject/student/faculty_registar/approve_subject_page.dart';
+import '../subject/student/faculty_registar/manage_courses_page.dart';
+import '../subject/student/faculty_registar/report_page.dart';
 import '../main.dart' show LoginPage;
 
 // ✅ This is what main.dart looks for

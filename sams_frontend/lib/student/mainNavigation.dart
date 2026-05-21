@@ -1,11 +1,11 @@
 
 import 'package:flutter/material.dart';
-import 'homepage.dart';
+import '../subject/student/homepage.dart';
 import '../attendance/student/class.dart';
-import 'register_courses.dart';
+import '../subject/student/register_courses.dart';
 
-import 'curriculum_page.dart';
-import 'fee_dashboard.dart';
+import '../Curriculum/pusat_adab/student/curriculum_page.dart';
+import '../tuition_fee/student/fee_dashboard.dart';
 
 
 class MainNavigation extends StatefulWidget {

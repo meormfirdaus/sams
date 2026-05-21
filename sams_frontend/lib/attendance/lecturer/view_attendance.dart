@@ -79,15 +79,14 @@ class ViewAttendancePage extends StatefulWidget {
 class _ViewAttendancePageState extends State<ViewAttendancePage> {
   String get _baseUrl {
     if (Platform.isAndroid) {
-<<<<<<< HEAD:sams_frontend/lib/attendance/lecturer/view_attendance.dart
+
       //return 'http://127.0.0.1:8000/api';
-=======
       // return 'http://127.0.0.1:8000/api';
->>>>>>> 2fdd6b7 (update):sams_frontend/lib/lecturer/view_attendance.dart
+
       return 'http://10.0.2.2:8000/api';
     }
-    // return 'http://10.0.2.2:8000/api';
-    return 'http://127.0.0.1:8000/api';
+    return 'http://10.0.2.2:8000/api';
+    //return 'http://127.0.0.1:8000/api';
   }
 
   bool _isLoading = true;
