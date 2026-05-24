@@ -378,7 +378,7 @@ class _PaymentRecordsPageState extends State<PaymentRecordsPage> {
                                         ],
                                       ),
                                     );
-                                  }).toList(),
+                                  }),
                               ],
                             ),
                           ),

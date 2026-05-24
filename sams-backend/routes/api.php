@@ -44,11 +44,22 @@ Route::delete('/attendance/records/{attendanceId}', [AttendanceController::class
 Route::get('/modules', [ModuleController::class, 'index']);
 Route::get('/modules/{id}/schedules', [ModuleController::class, 'schedules']);
 Route::post('/modules/book', [ModuleController::class, 'book']);
+Route::post('/pusat-adab/modules', [ModuleController::class, 'pusatAdabStoreModule']);
+Route::put('/pusat-adab/modules/{moduleId}', [ModuleController::class, 'pusatAdabUpdateModule']);
+Route::delete('/pusat-adab/modules/{moduleId}', [ModuleController::class, 'pusatAdabDeleteModule']);
+Route::post('/pusat-adab/modules/{moduleId}/schedules', [ModuleController::class, 'pusatAdabStoreSchedule']);
+Route::put('/pusat-adab/schedules/{scheduleId}', [ModuleController::class, 'pusatAdabUpdateSchedule']);
+Route::delete('/pusat-adab/schedules/{scheduleId}', [ModuleController::class, 'pusatAdabDeleteSchedule']);
 
 Route::get('/modules/my-bookings', [ModuleController::class, 'myBookings']);
+Route::get('/modules/activities', [ModuleController::class, 'joinedActivities']);
 Route::delete('/modules/bookings/{registrationId}/cancel', [ModuleController::class, 'cancelBooking']);
 Route::get('/modules/credit-claims', [ModuleController::class, 'creditClaims']);
 Route::post('/modules/credit-claims/apply', [ModuleController::class, 'applyCreditClaim']);
+Route::get('/pusat-adab/module-registrations', [ModuleController::class, 'pusatAdabModuleRegistrations']);
+Route::delete('/pusat-adab/module-registrations/{registrationId}', [ModuleController::class, 'pusatAdabRemoveModuleRegistration']);
+Route::get('/pusat-adab/credit-claims', [ModuleController::class, 'pusatAdabCreditClaims']);
+Route::post('/pusat-adab/credit-claims/{claimId}/status', [ModuleController::class, 'updateCreditClaimStatus']);
 
 
 //izzah

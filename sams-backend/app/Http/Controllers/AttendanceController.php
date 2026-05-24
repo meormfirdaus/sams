@@ -621,7 +621,10 @@ class AttendanceController extends Controller
                 'modules.name'
             )
             ->orderBy('modules.code')
+            ->orderByDesc('module_registrations.id')
             ->get()
+            ->unique('module_id')
+            ->values()
             ->map(function ($item) {
                 return [
                     'id' => $item->id,

@@ -151,17 +151,18 @@ class AuthController extends Controller
 
         // ─── PUSAT ADAB ─────────────────────────────────────────────────────────
         if ($role === 'pusat_adab') {
-            $pusatAdab = DB::table('users')
-                ->whereRaw('LOWER(role) = ?', ['pusat_adab'])
-                ->where(function ($q) use ($loginId) {
-                    $q->where('matric_number', $loginId)
-                      ->orWhere('email', strtolower($loginId));
-                })
+            $pusatAdab = DB::table('pusat_adab')
+                ->join('users', 'pusat_adab.user_id', '=', 'users.id')
+                ->where('pusat_adab.staff_id', $loginId)
+                ->whereRaw('LOWER(users.role) = ?', ['pusat_adab'])
                 ->select(
-                    'id as user_id',
-                    'name',
-                    'password',
-                    'role'
+                    'users.id as user_id',
+                    'users.name',
+                    'users.password',
+                    'users.role',
+                    'pusat_adab.id as pusat_adab_id',
+                    'pusat_adab.staff_id',
+                    'pusat_adab.department'
                 )
                 ->first();
 
@@ -177,6 +178,9 @@ class AuthController extends Controller
                 'lecturer_id'  => null,
                 'treasurer_id' => null,
                 'registrar_id' => null,
+                'pusat_adab_id' => $pusatAdab->pusat_adab_id,
+                'staff_id'     => $pusatAdab->staff_id,
+                'department'   => $pusatAdab->department,
                 'name'         => $pusatAdab->name,
             ]);
         }

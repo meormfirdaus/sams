@@ -132,23 +132,27 @@ class _CreditClaimPageState extends State<CreditClaimPage> {
   String actionText(Map<String, dynamic> item) {
     final String status =
         (item['claim_status'] ?? '--').toString().toUpperCase();
+    final bool canClaim = item['can_claim'] == true;
 
-    if (status == 'APPROVED') return 'Successfully Claim';
+    if (status == 'APPROVED') return 'Successfully Claimed';
     if (status == 'IN PROGRESS') return 'In Progress';
     if (status == 'REJECTED') return 'Rejected';
+    if (!canClaim) return 'Not Eligible';
 
     return 'Claim Now';
   }
   
   Color actionColor(Map<String, dynamic> item) {
-    final bool canClaim = item['can_claim'] == true;
     final String status = (item['claim_status'] ?? '--').toString().toUpperCase();
 
-    if (status == 'APPROVED') return const Color(0xFF9AA4B2);
-    if (status == 'IN PROGRESS' || status == 'REJECTED') {
+    if (status == 'IN PROGRESS') {
+      return const Color(0xFFFFA726);
+    }
+    if (status == 'REJECTED') {
       return const Color(0xFFEF4444);
     }
-    if (canClaim) return const Color(0xFF3FC7C4);
+    if (canTapClaim(item)) return const Color(0xFF3FC7C4);
+
     return const Color(0xFF9AA4B2);
   }
 
@@ -156,7 +160,7 @@ class _CreditClaimPageState extends State<CreditClaimPage> {
     final String status =
         (item['claim_status'] ?? '--').toString().toUpperCase();
 
-    return status == '--';
+    return status == '--' && item['can_claim'] == true;
   }
   Widget _buildHeader() {
     const primaryColor = Color(0xFF3FC7C4);

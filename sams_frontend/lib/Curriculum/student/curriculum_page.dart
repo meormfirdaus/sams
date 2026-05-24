@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'activities_page.dart';
 import 'module_booking_page.dart';
 import '../student/credit_claim_page.dart';
 
@@ -121,6 +122,13 @@ class CurriculumModuleCard extends StatelessWidget {
             context,
             MaterialPageRoute(
               builder: (context) => const CreditClaimPage(),
+            ),
+          );
+        } else if (title == 'Activities') {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const ActivitiesPage(),
             ),
           );
         } else {

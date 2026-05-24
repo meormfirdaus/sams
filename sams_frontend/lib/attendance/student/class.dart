@@ -85,13 +85,17 @@ Future<void> fetchRegisteredSubjectsWithId(int id) async {
             'attendanceEnabled': true,
           }).toList();
 
-      bookedModules = moduleData.map<Map<String, dynamic>>((item) => {
-            'id': item['id'],
-            'module_id': item['module_id'],
-            'code': item['code']?.toString() ?? '',
-            'name': item['name']?.toString() ?? '',
-            'attendanceEnabled': true,
-          }).toList();
+      final seenModuleIds = <String>{};
+      bookedModules = moduleData
+          .where((item) => seenModuleIds.add(item['module_id'].toString()))
+          .map<Map<String, dynamic>>((item) => {
+                'id': item['id'],
+                'module_id': item['module_id'],
+                'code': item['code']?.toString() ?? '',
+                'name': item['name']?.toString() ?? '',
+                'attendanceEnabled': true,
+              })
+          .toList();
 
       isLoading = false;
     });

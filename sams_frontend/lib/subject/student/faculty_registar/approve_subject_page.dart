@@ -64,8 +64,9 @@ class _ApproveSubjectPageState extends State<ApproveSubjectPage> {
         int pending = 0, approved = 0, rejected = 0;
         for (final s in parsed) {
           final status = (s['status'] ?? 'Pending').toString();
-          if (status == 'Approved') approved++;
-          else if (status == 'Rejected') rejected++;
+          if (status == 'Approved') {
+            approved++;
+          } else if (status == 'Rejected') rejected++;
           else pending++;
         }
 

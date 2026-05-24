@@ -607,7 +607,7 @@ class _PillDropdown extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<String>(
-      value: value,
+      initialValue: value,
       isExpanded: true,
       icon: const Icon(Icons.arrow_drop_down, size: 18),
       style: const TextStyle(color: Colors.black87, fontSize: 11),

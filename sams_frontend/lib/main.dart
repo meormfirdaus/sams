@@ -149,6 +149,15 @@ class _LoginPageState extends State<LoginPage> {
           await prefs.remove('treasurer_id');
         }
 
+        if (data['pusat_adab_id'] != null) {
+          final parsedPusatAdabId = int.tryParse(data['pusat_adab_id'].toString());
+          if (parsedPusatAdabId != null) {
+            await prefs.setInt('pusat_adab_id', parsedPusatAdabId);
+          }
+        } else {
+          await prefs.remove('pusat_adab_id');
+        }
+
         final resolvedRole = (data['role'] ?? apiRole).toString().trim();
         final normalizedRole = resolvedRole.toLowerCase();
 
@@ -160,38 +169,41 @@ class _LoginPageState extends State<LoginPage> {
             ),
           );
         } else if (normalizedRole == 'student') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const student_nav.MainNavigation(),
-          ),
-        );
-      } else if (normalizedRole == 'treasury' || normalizedRole == 'treasurer') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const treasurer_page.DashboardPage(),
-          ),
-        );
-      } else if (normalizedRole == 'faculty_registrar') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const faculty_reg_nav.MainNavigation(),
-          ),
-        );
-      } else if (normalizedRole == 'pusat_adab') {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(
-            builder: (context) => const pusat_adab_nav.MainNavigation(),
-          ),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(data['message']?.toString() ?? 'Login successful')),
-        );
-      }
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const student_nav.MainNavigation(),
+            ),
+          );
+        } else if (normalizedRole == 'treasury' || normalizedRole == 'treasurer') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const treasurer_page.DashboardPage(),
+            ),
+          );
+        } else if (normalizedRole == 'faculty_registrar') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const faculty_reg_nav.MainNavigation(),
+            ),
+          );
+        } else if (normalizedRole == 'pusat_adab' ||
+            normalizedRole == 'pusat adab') {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const pusat_adab_nav.MainNavigation(),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(data['message']?.toString() ?? 'Login successful'),
+            ),
+          );
+        }
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

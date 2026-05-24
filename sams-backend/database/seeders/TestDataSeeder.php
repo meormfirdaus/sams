@@ -30,6 +30,21 @@ class TestDataSeeder extends Seeder
             'updated_at' => now(),
         ]);
 
+        $pusatAdab = User::create([
+            'name' => 'Pusat Adab Admin',
+            'email' => 'pusatadab@umpsa.edu.my',
+            'password' => bcrypt('123456'),
+            'role' => 'pusat_adab',
+        ]);
+
+        DB::table('pusat_adab')->insert([
+            'user_id' => $pusatAdab->id,
+            'staff_id' => 'PA001',
+            'department' => 'Pusat Adab',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ]);
+
         // Create Students
         $student1 = User::create([
             'name' => 'Ahmad Zikri bin Roslan',

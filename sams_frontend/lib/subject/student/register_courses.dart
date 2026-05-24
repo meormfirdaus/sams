@@ -556,7 +556,7 @@ class _SelectRow extends StatelessWidget {
         const SizedBox(width: 8),
         Expanded(
           child: DropdownButtonFormField<String>(
-            value: items.contains(value) ? value : null,
+            initialValue: items.contains(value) ? value : null,
             hint: Text(hint, style: TextStyle(color: Colors.grey.shade500)),
             isExpanded: true,
             icon: const SizedBox.shrink(),

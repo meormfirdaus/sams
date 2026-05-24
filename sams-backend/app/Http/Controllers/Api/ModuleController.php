@@ -13,19 +13,23 @@ use Carbon\Carbon;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\DB;
 
+
 class ModuleController extends Controller
 {
     public function index(Request $request): JsonResponse
     {
         $studentId = $this->resolveStudentId($request->query('student_id'));
 
-        $modules = Module::with(['lecturer.user', 'registrations.schedule'])
+        $modules = Module::with(['lecturer.user', 'registrations.schedule', 'schedules'])
             ->orderBy('code')
-            ->get();
+            ->get()
+            ->unique(fn ($module) => strtoupper(trim((string) $module->code)))
+            ->values();
 
         $data = $modules->map(function ($module) use ($studentId) {
             $booked = false;
             $bookedClassDate = null;
+            $firstSchedule = $module->schedules->sortBy('class_date')->first();
 
             if ($studentId) {
                 $registration = $module->registrations
@@ -50,6 +54,12 @@ class ModuleController extends Controller
                 'location' => $module->location,
                 'lecturer' => $module->lecturer?->user?->name ?? 'N/A',
                 'category' => $module->category,
+                'class_date' => $firstSchedule?->class_date,
+                'start_time' => $firstSchedule?->start_time,
+                'end_time' => $firstSchedule?->end_time,
+                'venue' => $firstSchedule?->venue,
+                'capacity' => $firstSchedule?->capacity,
+                'schedule_id' => $firstSchedule?->id,
                 'booked' => $booked,
                 'booked_class_date' => $bookedClassDate,
             ];
@@ -141,7 +151,6 @@ class ModuleController extends Controller
 
         $alreadyBooked = ModuleRegistration::where('student_id', $resolvedStudentId)
             ->where('module_id', $request->module_id)
-            ->where('module_schedule_id', $request->module_schedule_id)
             ->exists();
 
         Log::info('Module booking duplicate check', [
@@ -155,7 +164,18 @@ class ModuleController extends Controller
         if ($alreadyBooked) {
             return response()->json([
                 'status' => false,
-                'message' => 'Student already booked this class.',
+                'message' => 'Student already booked this module.',
+            ], 400);
+        }
+
+        $bookedModuleCount = ModuleRegistration::where('student_id', $resolvedStudentId)
+            ->distinct('module_id')
+            ->count('module_id');
+
+        if ($bookedModuleCount >= 2) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Student can only book up to 2 modules.',
             ], 400);
         }
 
@@ -179,9 +199,268 @@ class ModuleController extends Controller
             'data' => $registration,
         ]);
     }
+
+    public function pusatAdabStoreModule(Request $request): JsonResponse
+    {
+        $request->validate([
+            'code' => 'required|string|max:255',
+            'name' => 'required|string|max:255',
+            'location' => 'nullable|string|max:255',
+            'category' => 'nullable|string|max:255',
+            'class_date' => 'required|date',
+            'start_time' => 'required|date_format:H:i',
+            'end_time' => 'required|date_format:H:i|after:start_time',
+            'venue' => 'required|string|max:255',
+            'capacity' => 'required|integer|min:1',
+            'lecturer_id' => 'nullable|integer',
+            'week_number' => 'nullable|integer',
+        ]);
+
+        $moduleCode = strtoupper(trim($request->code));
+
+        $moduleExists = Module::whereRaw('UPPER(code) = ?', [$moduleCode])->exists();
+
+        if ($moduleExists) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Module code already exists. Please use a different code.',
+            ], 422);
+        }
+
+        $module = new Module();
+
+        $module->code = $moduleCode;
+        $module->name = trim($request->name);
+        $module->location = $request->location ?: $request->venue;
+        $module->category = $request->category;
+
+        if ($request->filled('lecturer_id')) {
+            $module->lecturer_id = $request->lecturer_id;
+        }
+
+        $module->save();
+
+        $schedule = ModuleSchedule::create([
+            'module_id' => $module->id,
+            'class_date' => $request->class_date,
+            'start_time' => $request->start_time,
+            'end_time' => $request->end_time,
+            'venue' => $request->venue,
+            'capacity' => $request->capacity,
+            'booked_count' => 0,
+            'status' => 'available',
+            'session_type' => 'Module',
+            'week_number' => $request->week_number,
+        ]);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Module registered successfully.',
+            'data' => [
+                'module' => $module,
+                'schedule' => $schedule,
+            ],
+        ]);
+    }
+
+    public function pusatAdabUpdateModule(Request $request, int $moduleId): JsonResponse
+    {
+        $request->validate([
+            'code' => 'required|string|max:255',
+            'name' => 'required|string|max:255',
+            'location' => 'nullable|string|max:255',
+            'category' => 'nullable|string|max:255',
+            'class_date' => 'required|date',
+            'start_time' => 'required|date_format:H:i',
+            'end_time' => 'required|date_format:H:i|after:start_time',
+            'venue' => 'required|string|max:255',
+            'capacity' => 'required|integer|min:1',
+            'lecturer_id' => 'nullable|integer',
+            'week_number' => 'nullable|integer',
+        ]);
+
+        $module = Module::findOrFail($moduleId);
+        $moduleCode = strtoupper(trim($request->code));
+
+        $moduleExists = Module::whereRaw('UPPER(code) = ?', [$moduleCode])
+            ->where('id', '!=', $module->id)
+            ->exists();
+
+        if ($moduleExists) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Module code already exists. Please use a different code.',
+            ], 422);
+        }
+
+        $module->code = $moduleCode;
+        $module->name = trim($request->name);
+        $module->location = $request->location ?: $request->venue;
+        $module->category = $request->category;
+
+        if ($request->filled('lecturer_id')) {
+            $module->lecturer_id = $request->lecturer_id;
+        }
+
+        $module->save();
+
+        $schedule = ModuleSchedule::where('module_id', $module->id)
+            ->orderBy('id')
+            ->first();
+
+        if (!$schedule) {
+            $schedule = new ModuleSchedule();
+            $schedule->module_id = $module->id;
+            $schedule->booked_count = 0;
+            $schedule->status = 'available';
+            $schedule->session_type = 'Module';
+        }
+
+        $schedule->class_date = $request->class_date;
+        $schedule->start_time = $request->start_time;
+        $schedule->end_time = $request->end_time;
+        $schedule->venue = $request->venue;
+        $schedule->capacity = $request->capacity;
+        $schedule->week_number = $request->week_number;
+
+        if ($schedule->booked_count >= $schedule->capacity) {
+            $schedule->status = 'full';
+        } elseif ($schedule->status === 'full') {
+            $schedule->status = 'available';
+        }
+
+        $schedule->save();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Module updated successfully.',
+            'data' => [
+                'module' => $module,
+                'schedule' => $schedule,
+            ],
+        ]);
+    }
+
+    public function pusatAdabDeleteModule(int $moduleId): JsonResponse
+    {
+        $module = Module::findOrFail($moduleId);
+
+        DB::transaction(function () use ($module) {
+            $scheduleIds = ModuleSchedule::where('module_id', $module->id)->pluck('id');
+            $registrationIds = ModuleRegistration::where('module_id', $module->id)->pluck('id');
+
+            DB::table('credit_claims')
+                ->where('module_id', $module->id)
+                ->orWhereIn('registration_id', $registrationIds)
+                ->delete();
+
+            ModuleAttendance::whereIn('module_session_id', $scheduleIds)->delete();
+            ModuleRegistration::where('module_id', $module->id)->delete();
+            ModuleSchedule::where('module_id', $module->id)->delete();
+
+            $module->delete();
+        });
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Module deleted successfully.',
+        ]);
+    }
+
+    public function pusatAdabStoreSchedule(Request $request, int $moduleId): JsonResponse
+    {
+        Module::findOrFail($moduleId);
+
+        $request->validate([
+            'class_date' => 'required|date',
+            'start_time' => 'required|date_format:H:i',
+            'end_time' => 'required|date_format:H:i|after:start_time',
+            'venue' => 'required|string|max:255',
+            'capacity' => 'required|integer|min:1',
+            'week_number' => 'nullable|integer',
+        ]);
+
+        $schedule = ModuleSchedule::create([
+            'module_id' => $moduleId,
+            'class_date' => $request->class_date,
+            'start_time' => $request->start_time,
+            'end_time' => $request->end_time,
+            'venue' => $request->venue,
+            'capacity' => $request->capacity,
+            'booked_count' => 0,
+            'status' => 'available',
+            'session_type' => 'Module',
+            'week_number' => $request->week_number,
+        ]);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Class added successfully.',
+            'data' => $schedule,
+        ]);
+    }
+
+    public function pusatAdabUpdateSchedule(Request $request, int $scheduleId): JsonResponse
+    {
+        $schedule = ModuleSchedule::findOrFail($scheduleId);
+
+        $request->validate([
+            'class_date' => 'required|date',
+            'start_time' => 'required|date_format:H:i',
+            'end_time' => 'required|date_format:H:i|after:start_time',
+            'venue' => 'required|string|max:255',
+            'capacity' => 'required|integer|min:1',
+            'week_number' => 'nullable|integer',
+        ]);
+
+        if ((int) $request->capacity < (int) $schedule->booked_count) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Capacity cannot be lower than current booked count.',
+            ], 422);
+        }
+
+        $schedule->class_date = $request->class_date;
+        $schedule->start_time = $request->start_time;
+        $schedule->end_time = $request->end_time;
+        $schedule->venue = $request->venue;
+        $schedule->capacity = $request->capacity;
+        $schedule->week_number = $request->week_number;
+        $schedule->status = $schedule->booked_count >= $schedule->capacity ? 'full' : 'available';
+        $schedule->save();
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Class updated successfully.',
+            'data' => $schedule,
+        ]);
+    }
+
+    public function pusatAdabDeleteSchedule(int $scheduleId): JsonResponse
+    {
+        $schedule = ModuleSchedule::findOrFail($scheduleId);
+
+        DB::transaction(function () use ($schedule) {
+            $registrationIds = ModuleRegistration::where('module_schedule_id', $schedule->id)->pluck('id');
+
+            DB::table('credit_claims')
+                ->whereIn('registration_id', $registrationIds)
+                ->delete();
+
+            ModuleAttendance::where('module_session_id', $schedule->id)->delete();
+            ModuleRegistration::where('module_schedule_id', $schedule->id)->delete();
+
+            $schedule->delete();
+        });
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Class deleted successfully.',
+        ]);
+    }
     public function myBookings(Request $request): JsonResponse
     {
-        $studentId = $request->query('student_id');
+        $studentId = $this->resolveStudentId($request->query('student_id'));
 
         if (!$studentId) {
             return response()->json([
@@ -193,7 +472,9 @@ class ModuleController extends Controller
         $registrations = ModuleRegistration::with(['module', 'schedule'])
             ->where('student_id', $studentId)
             ->orderByDesc('id')
-            ->get();
+            ->get()
+            ->unique('module_id')
+            ->values();
 
         $data = $registrations->map(function ($registration) {
             $canCancel = false;
@@ -231,14 +512,61 @@ class ModuleController extends Controller
                 'module_id' => $registration->module_id,
                 'code' => $registration->module->code ?? '',
                 'name' => $registration->module->name ?? '',
+                'venue' => $registration->schedule?->venue ?? '',
+                'class_date' => $registration->schedule?->class_date ?? '',
+                'start_time' => $registration->schedule?->start_time ?? '',
+                'end_time' => $registration->schedule?->end_time ?? '',
+                'cats' => 2,
+                'attendance_status' => $attendanceStatus,
+                'attendance_percentage' => $attendancePercentage,
+                'can_cancel' => $canCancel,
+            ];
+        });
+
+        return response()->json([
+            'status' => true,
+            'data' => $data,
+        ]);
+    }
+
+    public function joinedActivities(Request $request): JsonResponse
+    {
+        $studentId = $this->resolveStudentId($request->query('student_id'));
+
+        if (!$studentId) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Student ID is required.',
+            ], 400);
+        }
+
+        $registrations = ModuleRegistration::with(['module', 'schedule'])
+            ->where('student_id', $studentId)
+            ->orderByDesc('id')
+            ->get()
+            ->unique('module_id')
+            ->values();
+
+        $data = $registrations->map(function ($registration) {
+            $attendance = ModuleAttendance::where('student_id', $registration->student_id)
+                ->where('module_session_id', $registration->module_schedule_id)
+                ->latest()
+                ->first();
+
+            $attendanceStatus = strtoupper($attendance->status ?? '--');
+
+            return [
+                'registration_id' => $registration->id,
+                'module_id' => $registration->module_id,
+                'code' => $registration->module->code ?? '',
+                'name' => $registration->module->name ?? '',
+                'category' => $registration->module->category ?? '',
                 'venue' => $registration->schedule->venue ?? '',
                 'class_date' => $registration->schedule->class_date ?? '',
                 'start_time' => $registration->schedule->start_time ?? '',
                 'end_time' => $registration->schedule->end_time ?? '',
                 'cats' => 2,
                 'attendance_status' => $attendanceStatus,
-                'attendance_percentage' => $attendancePercentage,
-                'can_cancel' => $canCancel,
             ];
         });
 
@@ -291,7 +619,7 @@ class ModuleController extends Controller
 
     public function creditClaims(Request $request): JsonResponse
 {
-    $studentId = $request->query('student_id');
+    $studentId = $this->resolveStudentId($request->query('student_id'));
 
     if (!$studentId) {
         return response()->json([
@@ -303,7 +631,9 @@ class ModuleController extends Controller
     $registrations = ModuleRegistration::with(['module', 'schedule'])
         ->where('student_id', $studentId)
         ->orderByDesc('id')
-        ->get();
+        ->get()
+        ->unique('module_id')
+        ->values();
 
     $data = $registrations->map(function ($registration) {
         $attendance = ModuleAttendance::where('student_id', $registration->student_id)
@@ -321,6 +651,10 @@ class ModuleController extends Controller
 
         $claimStatus = $claim->status ?? '--';
 
+        if ($attendanceStatus !== 'PRESENT' && !$claim) {
+            return null;
+        }
+
         return [
             'registration_id' => $registration->id,
             'module_id' => $registration->module_id,
@@ -331,7 +665,7 @@ class ModuleController extends Controller
             'claim_status' => strtoupper($claimStatus),
             'can_claim' => $progress && !$claim,
         ];
-    });
+    })->filter()->values();
 
     return response()->json([
         'status' => true,
@@ -346,9 +680,18 @@ class ModuleController extends Controller
             'student_id' => 'required|integer',
         ]);
 
+        $resolvedStudentId = $this->resolveStudentId((int) $request->student_id);
+
+        if (!$resolvedStudentId) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Student record not found.',
+            ], 404);
+        }
+
         $registration = ModuleRegistration::with(['module', 'schedule'])
             ->where('id', $request->registration_id)
-            ->where('student_id', $request->student_id)
+            ->where('student_id', $resolvedStudentId)
             ->first();
 
         if (!$registration) {
@@ -386,6 +729,7 @@ class ModuleController extends Controller
             'student_id' => $registration->student_id,
             'module_id' => $registration->module_id,
             'status' => 'IN PROGRESS',
+            'submitted_at' => now(),
             'created_at' => now(),
             'updated_at' => now(),
         ]);
@@ -393,6 +737,288 @@ class ModuleController extends Controller
         return response()->json([
             'status' => true,
             'message' => 'Credit claim submitted successfully.',
+        ]);
+    }
+
+    public function pusatAdabCreditClaims(Request $request): JsonResponse
+    {
+        $search = trim((string) $request->query('search', ''));
+        $status = strtoupper(trim((string) $request->query('status', '')));
+
+        $query = DB::table('credit_claims')
+            ->join('module_registrations', 'credit_claims.registration_id', '=', 'module_registrations.id')
+            ->join('modules', 'credit_claims.module_id', '=', 'modules.id')
+            ->join('students', 'credit_claims.student_id', '=', 'students.id')
+            ->join('users', 'students.user_id', '=', 'users.id')
+            ->leftJoin('module_schedules', 'module_registrations.module_schedule_id', '=', 'module_schedules.id')
+            ->select(
+                'credit_claims.id',
+                'credit_claims.registration_id',
+                'credit_claims.student_id',
+                'credit_claims.module_id',
+                'credit_claims.status',
+                'credit_claims.claim_percentage',
+                'credit_claims.priority',
+                'credit_claims.submitted_at',
+                'credit_claims.reviewed_at',
+                'credit_claims.created_at',
+                'credit_claims.updated_at',
+                'module_registrations.module_schedule_id',
+                'users.name as student_name',
+                'students.matric_no',
+                'modules.code as module_code',
+                'modules.name as module_name',
+                'modules.category',
+                'module_schedules.class_date',
+                'module_schedules.start_time',
+                'module_schedules.end_time',
+                'module_schedules.venue'
+            );
+
+        if ($search !== '') {
+            $query->where(function ($q) use ($search) {
+                $q->where('users.name', 'like', "%{$search}%")
+                    ->orWhere('students.matric_no', 'like', "%{$search}%")
+                    ->orWhere('modules.name', 'like', "%{$search}%")
+                    ->orWhere('modules.code', 'like', "%{$search}%");
+            });
+        }
+
+        if ($status !== '' && $status !== 'ALL') {
+            $query->whereRaw('UPPER(credit_claims.status) = ?', [$status]);
+        }
+
+        $claims = $query
+            ->orderByRaw("CASE WHEN UPPER(credit_claims.status) = 'IN PROGRESS' THEN 0 ELSE 1 END")
+            ->orderByDesc('credit_claims.created_at')
+            ->get();
+
+        $data = $claims->map(function ($claim) {
+            $attendance = ModuleAttendance::where('student_id', $claim->student_id)
+                ->where('module_session_id', $claim->module_schedule_id)
+                ->latest()
+                ->first();
+
+            return [
+                'id' => $claim->id,
+                'registration_id' => $claim->registration_id,
+                'student_id' => $claim->student_id,
+                'student_name' => $claim->student_name,
+                'matric_no' => $claim->matric_no,
+                'module_id' => $claim->module_id,
+                'module_code' => $claim->module_code,
+                'module_name' => $claim->module_name,
+                'category' => $claim->category,
+                'class_date' => $claim->class_date,
+                'start_time' => $claim->start_time,
+                'end_time' => $claim->end_time,
+                'venue' => $claim->venue,
+                'cats' => 2,
+                'attendance_status' => strtoupper($attendance->status ?? 'PRESENT'),
+                'attendance_percentage' => $attendance?->attendance_percentage ?: 90,
+                'status' => strtoupper($claim->status),
+                'priority' => strtoupper($claim->priority ?? 'NORMAL'),
+                'claim_percentage' => $claim->claim_percentage ?? 0,
+                'submitted_at' => $claim->submitted_at ?? $claim->created_at,
+                'reviewed_at' => $claim->reviewed_at,
+            ];
+        });
+
+        return response()->json([
+            'status' => true,
+            'summary' => [
+                'pending' => $data->where('status', 'IN PROGRESS')->count(),
+                'approved_today' => $data
+                    ->where('status', 'APPROVED')
+                    ->filter(fn ($item) => !empty($item['reviewed_at']) && Carbon::parse($item['reviewed_at'])->isToday())
+                    ->count(),
+                'urgent' => $data->where('priority', 'URGENT')->count(),
+            ],
+            'data' => $data->values(),
+        ]);
+    }
+
+    public function updateCreditClaimStatus(Request $request, int $claimId): JsonResponse
+    {
+        $request->validate([
+            'status' => 'required|string|in:APPROVED,REJECTED',
+            'reviewed_by' => 'nullable|integer',
+            'admin_remark' => 'nullable|string',
+        ]);
+
+        $claim = DB::table('credit_claims')->where('id', $claimId)->first();
+
+        if (!$claim) {
+            return response()->json([
+                'status' => false,
+                'message' => 'Credit claim not found.',
+            ], 404);
+        }
+
+        DB::table('credit_claims')
+            ->where('id', $claimId)
+            ->update([
+                'status' => strtoupper($request->status),
+                'reviewed_by' => $request->reviewed_by,
+                'reviewed_at' => now(),
+                'admin_remark' => $request->admin_remark,
+                'claim_percentage' => strtoupper($request->status) === 'APPROVED' ? 100 : 0,
+                'updated_at' => now(),
+            ]);
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Credit claim status updated successfully.',
+        ]);
+    }
+
+    public function pusatAdabModuleRegistrations(Request $request): JsonResponse
+    {
+        $search = trim((string) $request->query('search', ''));
+        $filter = strtoupper(trim((string) $request->query('filter', 'ALL')));
+
+        $registrations = ModuleRegistration::with(['module', 'schedule'])
+            ->orderByDesc('id')
+            ->get();
+
+        $data = $registrations->map(function ($registration) {
+            $student = DB::table('students')
+                ->join('users', 'students.user_id', '=', 'users.id')
+                ->where(function ($query) use ($registration) {
+                    $query->where('students.id', $registration->student_id)
+                        ->orWhere('students.user_id', $registration->student_id);
+                })
+                ->select('students.id', 'students.matric_no', 'users.name')
+                ->first();
+
+            $attendance = ModuleAttendance::where('student_id', $registration->student_id)
+                ->where('module_session_id', $registration->module_schedule_id)
+                ->latest()
+                ->first();
+
+            $claim = DB::table('credit_claims')
+                ->where('registration_id', $registration->id)
+                ->latest('id')
+                ->first();
+
+            return [
+                'registration_id' => $registration->id,
+                'student_id' => $registration->student_id,
+                'student_name' => $student->name ?? 'Unknown Student',
+                'matric_no' => $student->matric_no ?? '--',
+                'module_id' => $registration->module_id,
+                'module_schedule_id' => $registration->module_schedule_id,
+                'module_code' => $registration->module->code ?? '',
+                'module_name' => $registration->module->name ?? '',
+                'category' => $registration->module->category ?? '',
+                'venue' => $registration->schedule->venue ?? '',
+                'class_date' => $registration->schedule->class_date ?? '',
+                'start_time' => $registration->schedule->start_time ?? '',
+                'end_time' => $registration->schedule->end_time ?? '',
+                'attendance_status' => strtoupper($attendance->status ?? 'REGISTERED'),
+                'attendance_percentage' => $attendance?->attendance_percentage ?: 0,
+                'claim_status' => strtoupper($claim->status ?? 'NOT CLAIMED'),
+                'registered_at' => $registration->created_at,
+            ];
+        });
+
+        if ($search !== '') {
+            $needle = strtolower($search);
+            $data = $data->filter(function ($item) use ($needle) {
+                return str_contains(strtolower($item['student_name']), $needle)
+                    || str_contains(strtolower($item['matric_no']), $needle)
+                    || str_contains(strtolower($item['module_code']), $needle)
+                    || str_contains(strtolower($item['module_name']), $needle);
+            });
+        }
+
+        if ($filter !== '' && $filter !== 'ALL') {
+            $data = $data->filter(function ($item) use ($filter) {
+                if ($filter === 'CLAIMED') {
+                    return $item['claim_status'] !== 'NOT CLAIMED';
+                }
+
+                if ($filter === 'NOT CLAIMED') {
+                    return $item['claim_status'] === 'NOT CLAIMED';
+                }
+
+                return $item['attendance_status'] === $filter;
+            });
+        }
+
+        $data = $data->values();
+
+        $modules = $data
+            ->groupBy(function ($item) {
+                $code = strtoupper(trim((string) ($item['module_code'] ?? '')));
+
+                return $code !== '' ? $code : 'MODULE-' . $item['module_id'];
+            })
+            ->map(function ($records) {
+                $first = $records->first();
+
+                return [
+                    'module_id' => $first['module_id'],
+                    'module_schedule_id' => $first['module_schedule_id'],
+                    'module_code' => $first['module_code'],
+                    'module_name' => $first['module_name'],
+                    'category' => $first['category'],
+                    'venue' => $first['venue'],
+                    'class_date' => $first['class_date'],
+                    'start_time' => $first['start_time'],
+                    'end_time' => $first['end_time'],
+                    'total_registered' => $records->count(),
+                    'present' => $records->where('attendance_status', 'PRESENT')->count(),
+                    'claimed' => $records->filter(fn ($item) => $item['claim_status'] !== 'NOT CLAIMED')->count(),
+                    'approved' => $records->where('claim_status', 'APPROVED')->count(),
+                    'records' => $records->values(),
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'status' => true,
+            'summary' => [
+                'total_registered' => $data->count(),
+                'present' => $data->where('attendance_status', 'PRESENT')->count(),
+                'claims_submitted' => $data->filter(fn ($item) => $item['claim_status'] !== 'NOT CLAIMED')->count(),
+                'approved_claims' => $data->where('claim_status', 'APPROVED')->count(),
+            ],
+            'data' => $modules,
+        ]);
+    }
+
+    public function pusatAdabRemoveModuleRegistration(int $registrationId): JsonResponse
+    {
+        $registration = ModuleRegistration::with('schedule')->findOrFail($registrationId);
+
+        DB::transaction(function () use ($registration) {
+            DB::table('credit_claims')
+                ->where('registration_id', $registration->id)
+                ->delete();
+
+            ModuleAttendance::where('student_id', $registration->student_id)
+                ->where('module_session_id', $registration->module_schedule_id)
+                ->delete();
+
+            $schedule = ModuleSchedule::find($registration->module_schedule_id);
+
+            if ($schedule && $schedule->booked_count > 0) {
+                $schedule->booked_count = $schedule->booked_count - 1;
+
+                if ($schedule->status === 'full' && $schedule->booked_count < $schedule->capacity) {
+                    $schedule->status = 'available';
+                }
+
+                $schedule->save();
+            }
+
+            $registration->delete();
+        });
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Student removed from module successfully.',
         ]);
     }
 

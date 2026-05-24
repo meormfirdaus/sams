@@ -648,13 +648,13 @@ class _StudentHomepageState extends State<StudentHomepage> {
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
               onTap: _notifyFacultyRegistrar,
-              child: SizedBox(
+              child: const SizedBox(
                 width: 94,
                 height: double.infinity,
                 child: ColoredBox(
-                  color: const Color(0xFFBFE0FF),
+                  color: Color(0xFFBFE0FF),
                   child: Center(
-                    child: const Text(
+                    child: Text(
                       'NOTIFY',
                       style: TextStyle(
                         color: Colors.black,
@@ -737,7 +737,7 @@ class _SubjectCard extends StatelessWidget {
           const SizedBox(height: 12),
           _DetailLine(
             icon: Icons.lightbulb_outline,
-            iconColor: Color(0xFFFFB300),
+            iconColor: const Color(0xFFFFB300),
             text: '$credit Credit Hours',
           ),
           const SizedBox(height: 4),
