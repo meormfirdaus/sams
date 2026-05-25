@@ -42,6 +42,7 @@ Route::delete('/attendance/records/{attendanceId}', [AttendanceController::class
 
 //meor
 Route::get('/modules', [ModuleController::class, 'index']);
+Route::get('/lecturers', [ModuleController::class, 'lecturers']);
 Route::get('/modules/{id}/schedules', [ModuleController::class, 'schedules']);
 Route::post('/modules/book', [ModuleController::class, 'book']);
 Route::post('/pusat-adab/modules', [ModuleController::class, 'pusatAdabStoreModule']);

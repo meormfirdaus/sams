@@ -19,6 +19,8 @@ class ModuleController extends Controller
     public function index(Request $request): JsonResponse
     {
         $studentId = $this->resolveStudentId($request->query('student_id'));
+        $scope = strtolower((string) $request->query('scope', 'booking'));
+        $today = Carbon::today();
 
         $modules = Module::with(['lecturer.user', 'registrations.schedule', 'schedules'])
             ->orderBy('code')
@@ -26,14 +28,30 @@ class ModuleController extends Controller
             ->unique(fn ($module) => strtoupper(trim((string) $module->code)))
             ->values();
 
-        $data = $modules->map(function ($module) use ($studentId) {
+        $data = $modules->map(function ($module) use ($studentId, $scope, $today) {
             $booked = false;
             $bookedClassDate = null;
-            $firstSchedule = $module->schedules->sortBy('class_date')->first();
+            $bookableSchedules = $module->schedules
+                ->filter(function ($schedule) use ($today) {
+                    return $schedule->class_date
+                        && Carbon::parse($schedule->class_date)->greaterThanOrEqualTo($today)
+                        && $schedule->status === 'available'
+                        && (int) $schedule->booked_count < (int) $schedule->capacity;
+                })
+                ->sortBy('class_date')
+                ->values();
+            $firstSchedule = $scope === 'all'
+                ? $module->schedules->sortBy('class_date')->first()
+                : $bookableSchedules->first();
 
             if ($studentId) {
                 $registration = $module->registrations
                     ->where('student_id', (int) $studentId)
+                    ->filter(function ($registration) use ($today) {
+                        return $registration->schedule
+                            && $registration->schedule->class_date
+                            && Carbon::parse($registration->schedule->class_date)->greaterThanOrEqualTo($today);
+                    })
                     ->sortByDesc('id')
                     ->first();
 
@@ -47,12 +65,17 @@ class ModuleController extends Controller
                 }
             }
 
+            if ($scope !== 'all' && !$booked && !$firstSchedule) {
+                return null;
+            }
+
             return [
                 'id' => $module->id,
                 'code' => $module->code,
                 'name' => $module->name,
                 'location' => $module->location,
                 'lecturer' => $module->lecturer?->user?->name ?? 'N/A',
+                'lecturer_id' => $firstSchedule?->lecturer_id ?? $module->lecturer_id,
                 'category' => $module->category,
                 'class_date' => $firstSchedule?->class_date,
                 'start_time' => $firstSchedule?->start_time,
@@ -63,19 +86,56 @@ class ModuleController extends Controller
                 'booked' => $booked,
                 'booked_class_date' => $bookedClassDate,
             ];
-        });
+        })->filter()->values();
 
         return response()->json([
             'status' => true,
             'data' => $data,
         ]);
     }
-    public function schedules($id): JsonResponse
+
+    public function lecturers(): JsonResponse
     {
-        $module = Module::with(['lecturer.user', 'schedules'])
+        $lecturers = DB::table('lecturers')
+            ->join('users', 'lecturers.user_id', '=', 'users.id')
+            ->select(
+                'lecturers.id',
+                'lecturers.staff_id',
+                'users.name',
+                'users.email'
+            )
+            ->orderBy('users.name')
+            ->get();
+
+        return response()->json([
+            'status' => true,
+            'data' => $lecturers,
+        ]);
+    }
+
+    public function schedules(Request $request, $id): JsonResponse
+    {
+        $scope = strtolower((string) $request->query('scope', 'booking'));
+        $today = Carbon::today();
+        $module = Module::with(['lecturer.user', 'schedules.lecturer.user'])
             ->findOrFail($id);
 
-        $data = $module->schedules->map(function ($schedule) use ($module) {
+        $schedules = $module->schedules;
+
+        if ($scope !== 'all') {
+            $schedules = $schedules->filter(function ($schedule) use ($today) {
+                return $schedule->class_date
+                    && Carbon::parse($schedule->class_date)->greaterThanOrEqualTo($today)
+                    && $schedule->status === 'available'
+                    && (int) $schedule->booked_count < (int) $schedule->capacity;
+            });
+        }
+
+        $data = $schedules->sortBy('class_date')->map(function ($schedule) use ($module) {
+            $lecturerName = $schedule->lecturer?->user?->name
+                ?? $module->lecturer?->user?->name
+                ?? 'N/A';
+
             return [
                 'id' => $schedule->id,
                 'module_id' => $module->id,
@@ -85,12 +145,13 @@ class ModuleController extends Controller
                 'start_time' => $schedule->start_time,
                 'end_time' => $schedule->end_time,
                 'venue' => $schedule->venue,
-                'lecturer' => $module->lecturer?->user?->name ?? 'N/A',
+                'lecturer_id' => $schedule->lecturer_id,
+                'lecturer' => $lecturerName,
                 'status' => $schedule->status,
                 'capacity' => $schedule->capacity,
                 'booked_count' => $schedule->booked_count,
             ];
-        });
+        })->values();
 
         return response()->json([
             'status' => true,
@@ -132,10 +193,17 @@ class ModuleController extends Controller
 
         $schedule = ModuleSchedule::findOrFail($request->module_schedule_id);
 
-        if ($schedule->status === 'full') {
+        if ($schedule->class_date && Carbon::parse($schedule->class_date)->lt(Carbon::today())) {
             return response()->json([
                 'status' => false,
-                'message' => 'This class is already full.',
+                'message' => 'This class date has already passed.',
+            ], 400);
+        }
+
+        if ($schedule->status !== 'available') {
+            return response()->json([
+                'status' => false,
+                'message' => 'This class is not available for booking.',
             ], 400);
         }
 
@@ -212,7 +280,7 @@ class ModuleController extends Controller
             'end_time' => 'required|date_format:H:i|after:start_time',
             'venue' => 'required|string|max:255',
             'capacity' => 'required|integer|min:1',
-            'lecturer_id' => 'nullable|integer',
+            'lecturer_id' => 'required|integer|exists:lecturers,id',
             'week_number' => 'nullable|integer',
         ]);
 
@@ -247,6 +315,7 @@ class ModuleController extends Controller
             'end_time' => $request->end_time,
             'venue' => $request->venue,
             'capacity' => $request->capacity,
+            'lecturer_id' => $request->lecturer_id,
             'booked_count' => 0,
             'status' => 'available',
             'session_type' => 'Module',
@@ -275,7 +344,7 @@ class ModuleController extends Controller
             'end_time' => 'required|date_format:H:i|after:start_time',
             'venue' => 'required|string|max:255',
             'capacity' => 'required|integer|min:1',
-            'lecturer_id' => 'nullable|integer',
+            'lecturer_id' => 'required|integer|exists:lecturers,id',
             'week_number' => 'nullable|integer',
         ]);
 
@@ -321,6 +390,7 @@ class ModuleController extends Controller
         $schedule->end_time = $request->end_time;
         $schedule->venue = $request->venue;
         $schedule->capacity = $request->capacity;
+        $schedule->lecturer_id = $request->lecturer_id;
         $schedule->week_number = $request->week_number;
 
         if ($schedule->booked_count >= $schedule->capacity) {
@@ -377,6 +447,7 @@ class ModuleController extends Controller
             'end_time' => 'required|date_format:H:i|after:start_time',
             'venue' => 'required|string|max:255',
             'capacity' => 'required|integer|min:1',
+            'lecturer_id' => 'required|integer|exists:lecturers,id',
             'week_number' => 'nullable|integer',
         ]);
 
@@ -387,6 +458,7 @@ class ModuleController extends Controller
             'end_time' => $request->end_time,
             'venue' => $request->venue,
             'capacity' => $request->capacity,
+            'lecturer_id' => $request->lecturer_id,
             'booked_count' => 0,
             'status' => 'available',
             'session_type' => 'Module',
@@ -410,6 +482,7 @@ class ModuleController extends Controller
             'end_time' => 'required|date_format:H:i|after:start_time',
             'venue' => 'required|string|max:255',
             'capacity' => 'required|integer|min:1',
+            'lecturer_id' => 'required|integer|exists:lecturers,id',
             'week_number' => 'nullable|integer',
         ]);
 
@@ -425,6 +498,7 @@ class ModuleController extends Controller
         $schedule->end_time = $request->end_time;
         $schedule->venue = $request->venue;
         $schedule->capacity = $request->capacity;
+        $schedule->lecturer_id = $request->lecturer_id;
         $schedule->week_number = $request->week_number;
         $schedule->status = $schedule->booked_count >= $schedule->capacity ? 'full' : 'available';
         $schedule->save();

@@ -169,6 +169,50 @@ class _AvailableClassesPageState extends State<AvailableClassesPage> {
     return '$hour:$minute $suffix';
   }
 
+  Widget _emptyAvailableClassesNote() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE6E6E6)),
+        ),
+        child: const Column(
+          children: [
+            Icon(
+              Icons.event_busy_outlined,
+              color: Colors.black38,
+              size: 42,
+            ),
+            SizedBox(height: 10),
+            Text(
+              'No available classes',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+                color: Colors.black87,
+              ),
+            ),
+            SizedBox(height: 6),
+            Text(
+              'There are no upcoming available classes for this module at the moment.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.black54,
+                height: 1.3,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     const primaryColor = Color(0xFF43C7C7);
@@ -214,6 +258,8 @@ class _AvailableClassesPageState extends State<AvailableClassesPage> {
                   ? const Center(child: CircularProgressIndicator())
                   : _errorMessage.isNotEmpty
                       ? Center(child: Text(_errorMessage))
+                      : _schedules.isEmpty
+                          ? _emptyAvailableClassesNote()
                       : ListView.builder(
                           padding: const EdgeInsets.all(16),
                           itemCount: _schedules.length,

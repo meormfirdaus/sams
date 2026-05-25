@@ -26,11 +26,14 @@ class _RegisterModulePageState extends State<RegisterModulePage> {
   bool _isLoadingModules = true;
   String _errorMessage = '';
   int? _editingModuleId;
+  int? _selectedLecturerId;
+  List<Map<String, dynamic>> _lecturers = [];
   List<Map<String, dynamic>> _modules = [];
 
   @override
   void initState() {
     super.initState();
+    _fetchLecturers();
     _fetchModules();
   }
 
@@ -82,7 +85,7 @@ class _RegisterModulePageState extends State<RegisterModulePage> {
 
     try {
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:8000/api/modules'),
+        Uri.parse('http://10.0.2.2:8000/api/modules?scope=all'),
         headers: const {'Accept': 'application/json'},
       );
       final decoded = _decodeResponse(response);
@@ -122,11 +125,36 @@ class _RegisterModulePageState extends State<RegisterModulePage> {
     }
   }
 
+  Future<void> _fetchLecturers() async {
+    try {
+      final response = await http.get(
+        Uri.parse('http://10.0.2.2:8000/api/lecturers'),
+        headers: const {'Accept': 'application/json'},
+      );
+      final decoded = _decodeResponse(response);
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200 && decoded['status'] == true) {
+        final rows = decoded['data'] as List<dynamic>? ?? [];
+        setState(() {
+          _lecturers = rows
+              .whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList();
+          _selectedLecturerId ??= _lecturers.isEmpty
+              ? null
+              : int.tryParse(_lecturers.first['id']?.toString() ?? '');
+        });
+      }
+    } catch (_) {}
+  }
+
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
       initialDate: _classDate,
-      firstDate: DateTime.now().subtract(const Duration(days: 1)),
+      firstDate: DateTime(2020),
       lastDate: DateTime(DateTime.now().year + 5),
     );
 
@@ -168,6 +196,7 @@ class _RegisterModulePageState extends State<RegisterModulePage> {
         'location': _locationController.text.trim(),
         'venue': _venueController.text.trim(),
         'capacity': int.tryParse(_capacityController.text.trim()) ?? 30,
+        'lecturer_id': _selectedLecturerId,
         'class_date': _dateValue(_classDate),
         'start_time': _timeValue(_startTime),
         'end_time': _timeValue(_endTime),
@@ -230,6 +259,9 @@ class _RegisterModulePageState extends State<RegisterModulePage> {
       _locationController.clear();
       _venueController.clear();
       _capacityController.text = '30';
+      _selectedLecturerId = _lecturers.isEmpty
+          ? null
+          : int.tryParse(_lecturers.first['id']?.toString() ?? '');
       _classDate = DateTime.now();
       _startTime = const TimeOfDay(hour: 8, minute: 0);
       _endTime = const TimeOfDay(hour: 17, minute: 0);
@@ -246,6 +278,12 @@ class _RegisterModulePageState extends State<RegisterModulePage> {
       _venueController.text =
           module['venue']?.toString() ?? module['location']?.toString() ?? '';
       _capacityController.text = module['capacity']?.toString() ?? '30';
+      _selectedLecturerId = int.tryParse(
+        module['lecturer_id']?.toString() ?? '',
+      );
+      _selectedLecturerId ??= _lecturers.isEmpty
+          ? null
+          : int.tryParse(_lecturers.first['id']?.toString() ?? '');
       _classDate = _parseDate(module['class_date']?.toString());
       _startTime = _parseTime(
         module['start_time']?.toString(),
@@ -397,6 +435,38 @@ class _RegisterModulePageState extends State<RegisterModulePage> {
           borderSide: BorderSide.none,
         ),
       ),
+    );
+  }
+
+  Widget _lecturerDropdown() {
+    return DropdownButtonFormField<int>(
+      value: _selectedLecturerId,
+      validator: (value) => value == null ? 'Lecturer is required' : null,
+      decoration: InputDecoration(
+        labelText: 'Lecturer',
+        filled: true,
+        fillColor: const Color(0xFFF7F7F8),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide.none,
+        ),
+      ),
+      items: _lecturers.map((lecturer) {
+        final id = int.tryParse(lecturer['id']?.toString() ?? '');
+        final name = lecturer['name']?.toString() ?? 'Unknown Lecturer';
+        final staffId = lecturer['staff_id']?.toString() ?? '';
+
+        return DropdownMenuItem<int>(
+          value: id,
+          child: Text(
+            staffId.isEmpty ? name : '$staffId - $name',
+            overflow: TextOverflow.ellipsis,
+          ),
+        );
+      }).toList(),
+      onChanged: (value) {
+        setState(() => _selectedLecturerId = value);
+      },
     );
   }
 
@@ -589,6 +659,8 @@ class _RegisterModulePageState extends State<RegisterModulePage> {
                           const SizedBox(height: 12),
                           _field(_venueController, 'Venue'),
                           const SizedBox(height: 12),
+                          _lecturerDropdown(),
+                          const SizedBox(height: 12),
                           _field(
                             _capacityController,
                             'Capacity',
@@ -721,11 +793,14 @@ class _ManageModuleClassesPageState extends State<ManageModuleClassesPage> {
   bool _isLoading = true;
   bool _isSubmitting = false;
   int? _editingScheduleId;
+  int? _selectedLecturerId;
+  List<Map<String, dynamic>> _lecturers = [];
   List<Map<String, dynamic>> _schedules = [];
 
   @override
   void initState() {
     super.initState();
+    _fetchLecturers();
     _fetchSchedules();
   }
 
@@ -794,7 +869,7 @@ class _ManageModuleClassesPageState extends State<ManageModuleClassesPage> {
 
     try {
       final response = await http.get(
-        Uri.parse('http://10.0.2.2:8000/api/modules/$_moduleId/schedules'),
+        Uri.parse('http://10.0.2.2:8000/api/modules/$_moduleId/schedules?scope=all'),
         headers: const {'Accept': 'application/json'},
       );
       final decoded = _decodeResponse(response);
@@ -821,11 +896,36 @@ class _ManageModuleClassesPageState extends State<ManageModuleClassesPage> {
     }
   }
 
+  Future<void> _fetchLecturers() async {
+    try {
+      final response = await http.get(
+        Uri.parse('http://10.0.2.2:8000/api/lecturers'),
+        headers: const {'Accept': 'application/json'},
+      );
+      final decoded = _decodeResponse(response);
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200 && decoded['status'] == true) {
+        final rows = decoded['data'] as List<dynamic>? ?? [];
+        setState(() {
+          _lecturers = rows
+              .whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList();
+          _selectedLecturerId ??= _lecturers.isEmpty
+              ? null
+              : int.tryParse(_lecturers.first['id']?.toString() ?? '');
+        });
+      }
+    } catch (_) {}
+  }
+
   Future<void> _pickDate() async {
     final picked = await showDatePicker(
       context: context,
       initialDate: _classDate,
-      firstDate: DateTime.now().subtract(const Duration(days: 1)),
+      firstDate: DateTime(2020),
       lastDate: DateTime(DateTime.now().year + 5),
     );
 
@@ -865,6 +965,7 @@ class _ManageModuleClassesPageState extends State<ManageModuleClassesPage> {
         'end_time': _timeValue(_endTime),
         'venue': _venueController.text.trim(),
         'capacity': int.tryParse(_capacityController.text.trim()) ?? 30,
+        'lecturer_id': _selectedLecturerId,
       });
 
       final response = isEditing
@@ -907,6 +1008,9 @@ class _ManageModuleClassesPageState extends State<ManageModuleClassesPage> {
       _editingScheduleId = null;
       _venueController.clear();
       _capacityController.text = '30';
+      _selectedLecturerId = _lecturers.isEmpty
+          ? null
+          : int.tryParse(_lecturers.first['id']?.toString() ?? '');
       _classDate = DateTime.now();
       _startTime = const TimeOfDay(hour: 8, minute: 0);
       _endTime = const TimeOfDay(hour: 17, minute: 0);
@@ -918,6 +1022,12 @@ class _ManageModuleClassesPageState extends State<ManageModuleClassesPage> {
       _editingScheduleId = int.tryParse(schedule['id']?.toString() ?? '');
       _venueController.text = schedule['venue']?.toString() ?? '';
       _capacityController.text = schedule['capacity']?.toString() ?? '30';
+      _selectedLecturerId = int.tryParse(
+        schedule['lecturer_id']?.toString() ?? '',
+      );
+      _selectedLecturerId ??= _lecturers.isEmpty
+          ? null
+          : int.tryParse(_lecturers.first['id']?.toString() ?? '');
       _classDate = _parseDate(schedule['date']?.toString());
       _startTime = _parseTime(
         schedule['start_time']?.toString(),
@@ -1046,6 +1156,38 @@ class _ManageModuleClassesPageState extends State<ManageModuleClassesPage> {
           borderSide: BorderSide.none,
         ),
       ),
+    );
+  }
+
+  Widget _lecturerDropdown() {
+    return DropdownButtonFormField<int>(
+      value: _selectedLecturerId,
+      validator: (value) => value == null ? 'Lecturer is required' : null,
+      decoration: InputDecoration(
+        labelText: 'Lecturer',
+        filled: true,
+        fillColor: const Color(0xFFF7F7F8),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8),
+          borderSide: BorderSide.none,
+        ),
+      ),
+      items: _lecturers.map((lecturer) {
+        final id = int.tryParse(lecturer['id']?.toString() ?? '');
+        final name = lecturer['name']?.toString() ?? 'Unknown Lecturer';
+        final staffId = lecturer['staff_id']?.toString() ?? '';
+
+        return DropdownMenuItem<int>(
+          value: id,
+          child: Text(
+            staffId.isEmpty ? name : '$staffId - $name',
+            overflow: TextOverflow.ellipsis,
+          ),
+        );
+      }).toList(),
+      onChanged: (value) {
+        setState(() => _selectedLecturerId = value);
+      },
     );
   }
 
@@ -1207,6 +1349,8 @@ class _ManageModuleClassesPageState extends State<ManageModuleClassesPage> {
                             ),
                             const SizedBox(height: 12),
                             _field(_venueController, 'Venue'),
+                            const SizedBox(height: 12),
+                            _lecturerDropdown(),
                             const SizedBox(height: 12),
                             _field(
                               _capacityController,
